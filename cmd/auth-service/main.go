@@ -14,7 +14,7 @@ import (
 func main() {
 	// 1. Конфигурация (строка подключения, секрет JWT и т.д.)
 	dbURL := "postgres://user:password@localhost:5432/authdb?sslmode=disable"
-	jwtSecret := "your_secret_key" // Обычно берется из env
+	jwtSecret := "secret_key" // Обычно берется из env
 
 	// 2. Подключение к базе данных
 	db, err := sql.Open("postgres", dbURL)
@@ -34,6 +34,10 @@ func main() {
 	{
 		authGroup.POST("/register", handler.Register)
 		authGroup.POST("/login", handler.Login)
+		authGroup.GET("/me", handler.Me)
+		authGroup.POST("/forgot_password", handler.ForgotPassword)
+		authGroup.POST("/reset_password", handler.ResetPassword)
+		authGroup.POST("/verify_email", handler.VerifyEmail)
 	}
 
 	// 5. Запуск сервера

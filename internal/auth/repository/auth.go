@@ -9,7 +9,10 @@ import (
 type UserRepository interface {
 	Create(user *domain.User) error
 	FindByEmail(email string) (*domain.User, error)
-	// Добавить Update, Delete и другие методы
+	FindByID(id uint) (*domain.User, error)
+	Update(user *domain.User) error
+	FindByRefreshToken(refreshToken string) (*domain.User, error)
+	FindByResetToken(resetToken string) (*domain.User, error)
 }
 
 // userRepositoryPostgres — реализация репозитория для Postgres
@@ -23,7 +26,7 @@ func NewUserRepository(db *sql.DB) UserRepository {
 }
 
 /*
-	Create создает в базе данных нового пользователя, надо добавить обработку ошибки, когда неправильно введен пароль/логин или что-то такое
+Create создает в базе данных нового пользователя, надо добавить обработку ошибки, когда неправильно введен пароль/логин или что-то такое
 
 уникальные почты 100%
 */
@@ -41,6 +44,36 @@ func (r *userRepositoryPostgres) FindByEmail(email string) (*domain.User, error)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil // пользователь не найден
+		}
+		return nil, err
+	}
+	return &user, nil
+}
+
+//добавить функцию для поиска по id
+
+func (r *userRepositoryPostgres) FindByID(id uint) (*domain.User, error) {
+	query := "SELECT id, email, password_hash, name, created_at FROM users WHERE id = $1"
+	row := r.db.QueryRow(query, id)
+	var user domain.User
+	err := row.Scan(&user.ID, &user.Email, &user.PasswordHash, &user.Name, &user.CreatedAt)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil // пользователь не найден
+		}
+		return nil, err
+	}
+	return &user, nil
+}
+
+func (r *userRepositoryPostgres) FindByRefreshToken(refreshToken string) (*domain.User, error) {
+	query := "SELECT id, email, password_hash, name, created_at, refresh_token, refresh_token_expires_at FROM users WHERE refresh_token = $1"
+	row := r.db.QueryRow(query, refreshToken)
+	var user domain.User
+	err := row.Scan(&user.ID, &user.Email, &user.PasswordHash, &user.Name, &user.CreatedAt, &user.RefreshToken, &user.RefreshTokenExpiresAt)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil // refresh-токен не найден
 		}
 		return nil, err
 	}
