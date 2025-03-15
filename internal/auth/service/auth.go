@@ -1,5 +1,3 @@
-//Бизнес-логика
-
 package service
 
 import (
@@ -25,6 +23,7 @@ type AuthService interface {
 	ForgotPassword(email string) error
 	ResetPassword(resetToken string, newPassword string) error
 	VerifyEmail(email, verificationCode string) error
+	Logout(userID uint) error
 }
 
 // authServiceImpl — реализация AuthService
@@ -41,9 +40,8 @@ func NewAuthService(repo repository.UserRepository, secret string) AuthService {
 	}
 }
 
-// Register реализует регистрацию нового пользователя
+// Register - регистрация нового пользователя
 func (s *authServiceImpl) Register(email, password, name string) (*domain.User, *domain.Token, error) {
-	// Проверка на существование
 	existingUser, err := s.userRepo.FindByEmail(email)
 	if err != nil {
 		return nil, nil, err
@@ -52,13 +50,11 @@ func (s *authServiceImpl) Register(email, password, name string) (*domain.User, 
 		return nil, nil, errors.New("user already exists")
 	}
 
-	// Хеширование пароля
 	hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	//Создание пользователя
 	user := &domain.User{
 		Email:        email,
 		PasswordHash: string(hashed),
@@ -69,7 +65,6 @@ func (s *authServiceImpl) Register(email, password, name string) (*domain.User, 
 		return nil, nil, err
 	}
 
-	// Генерация токена
 	token, err := s.generateToken(user)
 	if err != nil {
 		return nil, nil, err
@@ -78,7 +73,7 @@ func (s *authServiceImpl) Register(email, password, name string) (*domain.User, 
 	return user, token, nil
 }
 
-// Login реализует вход пользователя
+// Login - вход пользователя
 func (s *authServiceImpl) Login(email, password string) (*domain.Token, error) {
 	user, err := s.userRepo.FindByEmail(email)
 	if err != nil {
@@ -88,29 +83,29 @@ func (s *authServiceImpl) Login(email, password string) (*domain.Token, error) {
 		return nil, errors.New("invalid credentials")
 	}
 
-	// Проверяем пароль
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
 		return nil, errors.New("invalid credentials")
 	}
 
-	// Генерируем токены
-	accessToken, err := s.generateToken(user)
-	if err != nil {
-		return nil, err
-	}
+	// Генерируем `refresh_token`
 	refreshToken, err := generateRandomToken(64)
 	if err != nil {
 		return nil, err
 	}
 
-	// Сохраняем refreshToken в БД
 	user.RefreshToken = refreshToken
 	user.RefreshTokenExpiresAt = time.Now().Add(7 * 24 * time.Hour) // refresh живёт 7 дней
+
 	if err := s.userRepo.Update(user); err != nil {
 		return nil, err
 	}
 
-	// Теперь возвращаем `refresh_token`
+	// Генерируем новый access-токен
+	accessToken, err := s.generateToken(user)
+	if err != nil {
+		return nil, err
+	}
+
 	return &domain.Token{
 		AccessToken:  accessToken.AccessToken,
 		ExpiresAt:    accessToken.ExpiresAt,
@@ -118,7 +113,7 @@ func (s *authServiceImpl) Login(email, password string) (*domain.Token, error) {
 	}, nil
 }
 
-// generateToken создает JWT для пользователя
+// generateToken - создает JWT
 func (s *authServiceImpl) generateToken(user *domain.User) (*domain.Token, error) {
 	claims := jwt.MapClaims{
 		"user_id": user.ID,
@@ -131,28 +126,14 @@ func (s *authServiceImpl) generateToken(user *domain.User) (*domain.Token, error
 		return nil, err
 	}
 
-	refreshToken, err := generateRandomToken(64) // Генерируем refresh токен
-	if err != nil {
-		return nil, err
-	}
-
-	// Обновляем refresh-токен в БД
-	user.RefreshToken = refreshToken
-	user.RefreshTokenExpiresAt = time.Now().Add(7 * 24 * time.Hour)
-	if err := s.userRepo.Update(user); err != nil {
-		return nil, err
-	}
-
 	return &domain.Token{
-		AccessToken:  tokenString,
-		ExpiresAt:    time.Now().Add(24 * time.Hour),
-		RefreshToken: refreshToken,
+		AccessToken: tokenString,
+		ExpiresAt:   time.Now().Add(24 * time.Hour),
 	}, nil
 }
 
-// Refresh - обновляет токен, необходимый, чтобы клиент каждлый раз не входил в аккаунт
+// Refresh - обновляет access_token
 func (s *authServiceImpl) Refresh(refreshToken string) (*domain.Token, error) {
-	// Проверяем refresh-токен в БД
 	user, err := s.userRepo.FindByRefreshToken(refreshToken)
 	if err != nil {
 		return nil, errors.New("invalid refresh token")
@@ -161,19 +142,19 @@ func (s *authServiceImpl) Refresh(refreshToken string) (*domain.Token, error) {
 		return nil, errors.New("refresh token expired or invalid")
 	}
 
-	// Генерируем новые токены
 	newAccessToken, err := s.generateToken(user)
 	if err != nil {
 		return nil, err
 	}
+
 	newRefreshToken, err := generateRandomToken(64)
 	if err != nil {
 		return nil, err
 	}
 
-	// Обновляем refresh-токен в БД (удаляем старый!)
 	user.RefreshToken = newRefreshToken
 	user.RefreshTokenExpiresAt = time.Now().Add(7 * 24 * time.Hour)
+
 	if err := s.userRepo.Update(user); err != nil {
 		return nil, err
 	}
@@ -185,119 +166,34 @@ func (s *authServiceImpl) Refresh(refreshToken string) (*domain.Token, error) {
 	}, nil
 }
 
-// ForgotPassword — отправляет письмо со ссылкой или кодом для сброса пароля
+// ForgotPassword - отправляет письмо со сбросом пароля
 func (s *authServiceImpl) ForgotPassword(email string) error {
-
-	// Находим пользователя по email
 	user, err := s.userRepo.FindByEmail(email)
 	if err != nil {
 		return err
 	}
 	if user == nil {
-		return errors.New("user not found")
+		return nil
 	}
 
-	// Генерируем токен
 	resetToken, err := generateRandomToken(32)
 	if err != nil {
 		return err
 	}
 
-	// Генерация токена для сброса пароля
 	user.ResetToken = resetToken
 	user.ResetTokenExpiresAt = time.Now().Add(1 * time.Hour)
 
-	// Сохраняем изменения в БД:
 	if err := s.userRepo.Update(user); err != nil {
 		return err
 	}
 
 	resetLink := "https://yourfrontend.com/reset-password?token=" + resetToken
-	// Отправляем письмо со ссылкой/токеном
-	if err := sendResetLinkToEmail(user.Email, resetLink); err != nil {
-		return err
-	}
-
-	return nil
+	return SendResetLinkToEmail(user.Email, resetLink)
 }
 
-// ResetPassword — устанавливает новый пароль по действительному reset-токену
-func (s *authServiceImpl) ResetPassword(resetToken string, newPassword string) error {
-	// Находим пользователя по resetToken
-	user, err := s.userRepo.FindByResetToken(resetToken)
-	if err != nil {
-		return err
-	}
-	if user == nil {
-		return errors.New("invalid or expired reset token")
-	}
-	// Проверяем срок действия
-	if time.Now().After(user.ResetTokenExpiresAt) {
-		return errors.New("reset token is expired")
-	}
-
-	// Хешируем новый пароль
-	hashed, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
-	if err != nil {
-		return err
-	}
-
-	// Сохраняем новый пароль
-	user.PasswordHash = string(hashed)
-
-	// Удаляем `reset_token`, чтобы нельзя было использовать повторно
-	user.ResetToken = ""
-	user.ResetTokenExpiresAt = time.Time{}
-
-	if err := s.userRepo.Update(user); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// VerifyEmail — подтверждает email пользователя по коду
-func (s *authServiceImpl) VerifyEmail(email, verificationCode string) error {
-
-	//Находим в БД email
-	user, err := s.userRepo.FindByEmail(email)
-	if err != nil {
-		return err
-	}
-	if user == nil {
-		return errors.New("user not found")
-	}
-
-	// Сравниваем код, например user.VerificationCode
-	if user.VerificationCode != verificationCode {
-		return errors.New("invalid verification code")
-	}
-
-	// Отмечаем, что email подтвержден
-	user.EmailVerified = true
-	user.VerificationCode = "" // можно очистить
-
-	if err := s.userRepo.Update(user); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// ------------- Вспомогательные функции --------------
-
-// generateRandomToken - генерирует на основе библиотеки rand токен размером в 64 бита
-func generateRandomToken(length int) (string, error) {
-	bytes := make([]byte, length)
-	_, err := rand.Read(bytes)
-	if err != nil {
-		return "", err
-	}
-	return base64.URLEncoding.EncodeToString(bytes), nil
-}
-
-// sendResetLinkToEmail - отправляет письмо на email с помощью
-func sendResetLinkToEmail(email, resetLink string) error {
+// SendResetLinkToEmail - отправляет письмо на email
+func SendResetLinkToEmail(email, resetLink string) error {
 	from := "uconf@mail.ru"
 	password := "yourconfigurate1"
 	smtpServer := "smtp.mail.ru"
@@ -316,6 +212,59 @@ func sendResetLinkToEmail(email, resetLink string) error {
 	return nil
 }
 
+// ResetPassword - устанавливает новый пароль
+func (s *authServiceImpl) ResetPassword(resetToken string, newPassword string) error {
+	user, err := s.userRepo.FindByResetToken(resetToken)
+	if err != nil {
+		return err
+	}
+	if user == nil || time.Now().After(user.ResetTokenExpiresAt) {
+		return errors.New("invalid or expired reset token")
+	}
+
+	hashed, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+
+	if err := s.userRepo.UpdatePassword(user.ID, string(hashed)); err != nil {
+		return err
+	}
+
+	return s.userRepo.DeleteResetToken(user.ID)
+}
+
+// VerifyEmail - подтверждает email
+func (s *authServiceImpl) VerifyEmail(email, verificationCode string) error {
+	user, err := s.userRepo.FindByEmail(email)
+	if err != nil {
+		return err
+	}
+	if user == nil {
+		return errors.New("user not found")
+	}
+
+	if user.VerificationCode != verificationCode {
+		return errors.New("invalid verification code")
+	}
+
+	user.EmailVerified = true
+	user.VerificationCode = ""
+
+	return s.userRepo.Update(user)
+}
+
+// generateRandomToken - генерация случайного токена
+func generateRandomToken(length int) (string, error) {
+	bytes := make([]byte, length)
+	_, err := rand.Read(bytes)
+	if err != nil {
+		return "", err
+	}
+	return base64.URLEncoding.EncodeToString(bytes), nil
+}
+
+// GetUserByID - получает пользователя по ID
 func (s *authServiceImpl) GetUserByID(userID uint) (*domain.User, error) {
 	user, err := s.userRepo.FindByID(userID)
 	if err != nil {
@@ -325,4 +274,9 @@ func (s *authServiceImpl) GetUserByID(userID uint) (*domain.User, error) {
 		return nil, errors.New("user not found")
 	}
 	return user, nil
+}
+
+// Logout - выход из профиля, удаляет refresh-токен
+func (s *authServiceImpl) Logout(userID uint) error {
+	return s.userRepo.DeleteRefreshToken(userID)
 }

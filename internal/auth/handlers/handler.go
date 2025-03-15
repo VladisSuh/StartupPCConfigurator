@@ -191,3 +191,23 @@ func (h *Handler) VerifyEmail(c *gin.Context) {
 		"message": "Email verified successfully.",
 	})
 }
+
+// Logout обрабатывает POST /auth/logout
+// Удаляет refresh_token и завершает сессию пользователя
+func (h *Handler) Logout(c *gin.Context) {
+	var req struct {
+		UserID uint `json:"user_id"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		return
+	}
+
+	err := h.authService.Logout(req.UserID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not log out user"})
+		return
+	}
+
+	c.JSON(http.StatusNoContent, nil) // 204 - успешный выход, без тела ответа
+}
