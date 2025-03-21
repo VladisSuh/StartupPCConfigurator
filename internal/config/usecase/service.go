@@ -2,9 +2,10 @@ package usecase
 
 import (
 	"StartupPCConfigurator/internal/config/repository"
+	"StartupPCConfigurator/internal/domain"
 	"errors"
-	"fmt"
-	"time"
+	_ "fmt"
+	_ "time"
 )
 
 var (
@@ -14,10 +15,10 @@ var (
 
 // Интерфейс, который будет использовать хендлер
 type ConfigService interface {
-	FetchComponents(category, search string) ([]repository.Component, error)
-	CreateConfiguration(userId, name string, comps []repository.ComponentRef) (repository.Configuration, error)
-	FetchUserConfigurations(userId string) ([]repository.Configuration, error)
-	UpdateConfiguration(userId, configId string, name string, comps []repository.ComponentRef) (repository.Configuration, error)
+	FetchComponents(category, search string) ([]domain.Component, error)
+	CreateConfiguration(userId, name string, comps []domain.ComponentRef) (domain.Configuration, error)
+	FetchUserConfigurations(userId string) ([]domain.Configuration, error)
+	UpdateConfiguration(userId, configId string, name string, comps []domain.ComponentRef) (domain.Configuration, error)
 	DeleteConfiguration(userId, configId string) error
 }
 
@@ -30,17 +31,17 @@ func NewConfigService(r repository.ConfigRepository) ConfigService {
 	return &configService{repo: r}
 }
 
-func (s *configService) FetchComponents(category, search string) ([]repository.Component, error) {
+func (s *configService) FetchComponents(category, search string) ([]domain.Component, error) {
 	return s.repo.GetComponents(category, search)
 }
 
-func (s *configService) CreateConfiguration(userId, name string, comps []repository.ComponentRef) (repository.Configuration, error) {
+func (s *configService) CreateConfiguration(userId, name string, comps []domain.ComponentRef) (domain.Configuration, error) {
 	// тут можно проверить бизнес-логику (пустое имя? нет компонентов?)
 	if name == "" {
-		return repository.Configuration{}, errors.New("name is required")
+		return domain.Configuration{}, errors.New("name is required")
 	}
 	if len(comps) == 0 {
-		return repository.Configuration{}, errors.New("at least one component required")
+		return domain.Configuration{}, errors.New("at least one component required")
 	}
 
 	// Можно проверить совместимость, если у нас есть правила:
@@ -51,16 +52,21 @@ func (s *configService) CreateConfiguration(userId, name string, comps []reposit
 	return config, err
 }
 
-func (s *configService) FetchUserConfigurations(userId string) ([]repository.Configuration, error) {
+func (s *configService) FetchUserConfigurations(userId string) ([]domain.Configuration, error) {
 	return s.repo.GetUserConfigurations(userId)
 }
 
-func (s *configService) UpdateConfiguration(userId, configId string, name string, comps []repository.ComponentRef) (repository.Configuration, error) {
+func (s *configService) UpdateConfiguration(userId, configId string, name string, comps []domain.ComponentRef) (domain.Configuration, error) {
 	// Проверить, что конфигурация принадлежит userId, что она существует
 	// Проверить логику
 	updated, err := s.repo.UpdateConfiguration(userId, configId, name, comps)
 	if err != nil {
-		return repository.Configuration{}, err
+		if errors.Is(err, domain.ErrConfigNotFound) {
+			return domain.Configuration{}, domain.ErrConfigNotFound
+		} else if errors.Is(err, domain.ErrForbidden) {
+			return domain.Configuration{}, domain.ErrForbidden
+		}
+		return domain.Configuration{}, err
 	}
 	return updated, nil
 }

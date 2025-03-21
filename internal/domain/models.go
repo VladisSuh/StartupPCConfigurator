@@ -1,6 +1,9 @@
 package domain
 
-import "time"
+import (
+	"errors"
+	"time"
+)
 
 // User — основная модель пользователя
 type User struct {
@@ -50,4 +53,10 @@ type Configuration struct {
 	Components []ComponentRef // не обязательно хранить здесь, т.к. в БД связь через configuration_components
 	CreatedAt  time.Time      `db:"created_at"`
 	UpdatedAt  time.Time      `db:"updated_at"`
+	OwnerID    string
 }
+
+var (
+	ErrConfigNotFound = errors.New("configuration not found")
+	ErrForbidden      = errors.New("forbidden")
+)
