@@ -72,6 +72,14 @@ func (s *configService) UpdateConfiguration(userId, configId string, name string
 }
 
 func (s *configService) DeleteConfiguration(userId, configId string) error {
-	// Проверить право на удаление
-	return s.repo.DeleteConfiguration(userId, configId)
+	err := s.repo.DeleteConfiguration(userId, configId)
+	if err != nil {
+		if errors.Is(err, domain.ErrConfigNotFound) {
+			return domain.ErrConfigNotFound
+		} else if errors.Is(err, domain.ErrForbidden) {
+			return domain.ErrForbidden
+		}
+		return err
+	}
+	return nil
 }

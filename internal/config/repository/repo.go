@@ -14,6 +14,8 @@ type ConfigRepository interface {
 	GetComponents(category, search string) ([]domain.Component, error)
 	CreateConfiguration(userId, name string, components []domain.ComponentRef) (domain.Configuration, error)
 	UpdateConfiguration(userId, configId, name string, comps []domain.ComponentRef) (domain.Configuration, error)
+	GetUserConfigurations(userId string) ([]domain.Configuration, error)
+	DeleteConfiguration(userId, configId string) error
 }
 
 // Реализация
@@ -270,3 +272,90 @@ func (r *configRepository) UpdateConfiguration(
 }
 
 // И т.д. для CreateConfiguration, Update, DeleteConfiguration...
+func (r *configRepository) GetUserConfigurations(userId string) ([]domain.Configuration, error) {
+	queryConfigs := `
+        SELECT id, name, created_at, updated_at
+        FROM configurations
+        WHERE user_id = $1
+    `
+	rows, err := r.db.Query(queryConfigs, userId)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var configs []domain.Configuration
+	for rows.Next() {
+		var cfg domain.Configuration
+		cfg.OwnerID = userId
+		if err := rows.Scan(&cfg.ID, &cfg.Name, &cfg.CreatedAt, &cfg.UpdatedAt); err != nil {
+			return nil, err
+		}
+
+		// Подтягиваем компоненты для этой конфигурации
+		compQuery := `
+            SELECT component_id, category
+            FROM configuration_components
+            WHERE config_id = $1
+        `
+		compRows, err := r.db.Query(compQuery, cfg.ID)
+		if err != nil {
+			return nil, err
+		}
+
+		for compRows.Next() {
+			var ref domain.ComponentRef
+			if err := compRows.Scan(&ref.ComponentID, &ref.Category); err != nil {
+				compRows.Close()
+				return nil, err
+			}
+			cfg.Components = append(cfg.Components, ref)
+		}
+		compRows.Close()
+
+		configs = append(configs, cfg)
+	}
+
+	return configs, nil
+}
+
+func (r *configRepository) DeleteConfiguration(userId, configId string) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			tx.Rollback()
+		} else {
+			tx.Commit()
+		}
+	}()
+
+	// Проверяем, что конфигурация существует и принадлежит пользователю
+	var owner string
+	checkQuery := `SELECT user_id FROM configurations WHERE id = $1`
+	err = tx.QueryRow(checkQuery, configId).Scan(&owner)
+	if err == sql.ErrNoRows {
+		return domain.ErrConfigNotFound
+	} else if err != nil {
+		return err
+	}
+	if owner != userId {
+		return domain.ErrForbidden
+	}
+
+	// Удаляем компоненты
+	delComponents := `DELETE FROM configuration_components WHERE config_id = $1`
+	if _, err = tx.Exec(delComponents, configId); err != nil {
+		return err
+	}
+
+	// Удаляем саму конфигурацию
+	delConfig := `DELETE FROM configurations WHERE id = $1`
+	if _, err = tx.Exec(delConfig, configId); err != nil {
+		return err
+	}
+
+	return nil
+}
