@@ -9,12 +9,14 @@ import (
 	"StartupPCConfigurator/internal/config/repository"
 	"StartupPCConfigurator/internal/config/usecase"
 	"github.com/gin-gonic/gin"
+	_ "github.com/lib/pq"
 	// Подключения для БД, миграций и т.д.
 )
 
 func main() {
 	// 1. Инициализируем соединение с БД
-	db, err := initDB()
+	dbURL := "postgres://user:password@localhost:5432/authdb?sslmode=disable"
+	db, err := sql.Open("postgres", dbURL)
 	if err != nil {
 		log.Fatalf("Failed to init DB: %v", err)
 	}
@@ -52,17 +54,17 @@ func main() {
 	r.Run(":" + port)
 }
 
-func initDB() (*sql.DB, error) {
-	// Пример: чтение DSN из env или конфига
-	dsn := os.Getenv("DB_DSN")
-	// Подключение к Postgres (github.com/lib/pq)
-	db, err := sql.Open("postgres", dsn)
-	if err != nil {
-		return nil, err
-	}
-	// Проверка соединения
-	if err := db.Ping(); err != nil {
-		return nil, err
-	}
-	return db, nil
-}
+//func initDB() (*sql.DB, error) {
+//	// Пример: чтение DSN из env или конфига
+//	dsn := os.Getenv("DB_DSN")
+//	// Подключение к Postgres (github.com/lib/pq)
+//	db, err := sql.Open("postgres", dsn)
+//	if err != nil {
+//		return nil, err
+//	}
+//	// Проверка соединения
+//	if err := db.Ping(); err != nil {
+//		return nil, err
+//	}
+//	return db, nil
+//}
