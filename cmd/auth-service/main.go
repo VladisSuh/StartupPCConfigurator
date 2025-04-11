@@ -13,7 +13,7 @@ import (
 
 func main() {
 	// 1. Конфигурация (строка подключения, секрет JWT и т.д.)
-	dbURL := "postgres://user:password@localhost:5432/authdb?sslmode=disable"
+	dbURL := "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable"
 	jwtSecret := "secret_key" // Обычно берется из env
 
 	// 2. Подключение к базе данных
@@ -42,7 +42,7 @@ func main() {
 
 	// 5. Запуск сервера
 	log.Println("Auth service running on :8080")
-	if err := router.Run(":8080"); err != nil {
+	if err := router.Run(":8088"); err != nil {
 		log.Fatal("Server failed:", err)
 	}
 }

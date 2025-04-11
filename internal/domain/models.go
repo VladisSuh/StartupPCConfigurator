@@ -60,3 +60,25 @@ var (
 	ErrConfigNotFound = errors.New("configuration not found")
 	ErrForbidden      = errors.New("forbidden")
 )
+
+type Offer struct {
+	ComponentID  string  `json:"componentId"`
+	ShopID       string  `json:"shopId"`
+	ShopName     string  `json:"shopName"`
+	Price        float64 `json:"price"`
+	Currency     string  `json:"currency"`
+	Availability string  `json:"availability"`
+	URL          string  `json:"url"`
+}
+
+// OffersFilter описывает фильтры/параметры для запроса
+type OffersFilter struct {
+	ComponentID string
+	Sort        string // "priceAsc" | "priceDesc" | ...
+}
+
+type UpdateEvent struct {
+	ShopID   string `json:"shopId"`
+	Action   string `json:"action"`
+	Metadata string `json:"metadata"`
+}
