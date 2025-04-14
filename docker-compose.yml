@@ -1,0 +1,103 @@
+version: "3.8"
+
+services:
+  # ---------- Auth Service ----------
+  auth:
+    build:
+      context: .
+      dockerfile: ./cmd/auth-service/Dockerfile
+    container_name: auth_service
+    # Пробрасываем порт 8080 наружу
+    ports:
+      - "8080:8080"
+    environment:
+      - DB_CONN_STR=postgres://postgres:postgres@postgres:5432/postgres_db?sslmode=disable
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - REDIS_URL=redis:6379
+    depends_on:
+      - postgres
+      - rabbitmq
+      - redis
+
+  # ---------- Config Service ----------
+  config:
+    build:
+      context: .
+      dockerfile: ./cmd/config-service/Dockerfile
+    container_name: config_service
+    ports:
+      - "8081:8081"
+    environment:
+      - DB_CONN_STR=postgres://postgres:postgres@postgres:5432/postgres_db?sslmode=disable
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - REDIS_URL=redis:6379
+    depends_on:
+      - postgres
+      - rabbitmq
+      - redis
+
+  # ---------- Aggregator Service ----------
+  aggregator:
+    build:
+      context: .
+      dockerfile: ./cmd/aggregator-service/Dockerfile
+    container_name: aggregator_service
+    ports:
+      - "8082:8082"
+    environment:
+      - DB_CONN_STR=postgres://postgres:postgres@postgres:5432/postgres_db?sslmode=disable
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - REDIS_URL=redis:6379
+    depends_on:
+      - postgres
+      - rabbitmq
+      - redis
+
+  # ---------- Gateway (API Gateway) ----------
+#  gateway:
+#    build:
+#      context: .
+#      dockerfile: ./cmd/gateway/Dockerfile
+#    container_name: gateway_service
+#    ports:
+#      - "8088:8080"
+#    environment:
+#      - AUTH_SERVICE_URL=http://auth:8080
+#      - CONFIG_SERVICE_URL=http://config:8081
+#      - AGGREGATOR_SERVICE_URL=http://aggregator:8082
+#      # ... возможно, здесь же RABBITMQ_URL, REDIS_URL, etc
+#    depends_on:
+#      - auth
+#      - config
+#      - aggregator
+
+  # ---------- RabbitMQ ----------
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"  # веб-интерфейс
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+
+  # ---------- Postgres ----------
+  postgres:
+    image: postgres:15-alpine
+    container_name: postgres_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres_db
+    ports:
+      - "5432:5432"
+    # Можно создать несколько БД скриптами, или пользоваться одной
+    # init scripts, etc.
+
+  # ---------- Redis ----------
+  redis:
+    image: redis:alpine
+    container_name: redis_cache
+    ports:
+      - "6379:6379"

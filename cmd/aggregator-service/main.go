@@ -5,6 +5,7 @@ import (
 	"github.com/streadway/amqp"
 	"log"
 	"os"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -31,12 +32,21 @@ func main() {
 	offersUC := usecase.NewOffersUseCase(repo, logger)
 
 	// === 3. Подключение к RabbitMQ ===
-	rabbitURL := os.Getenv("RABBITMQ_URL")
-	if rabbitURL == "" {
-		rabbitURL = "amqp://guest:guest@localhost:5672/"
+	var conn *amqp.Connection
+	for i := 0; i < 10; i++ {
+		rabbitURL := os.Getenv("RABBITMQ_URL")
+		if rabbitURL == "" {
+			rabbitURL = "amqp://guest:guest@localhost:5672/"
+		}
+		conn, err = amqp.Dial(rabbitURL)
+		if err == nil {
+			log.Println("Успешно подключились к RabbitMQ")
+			break
+		}
+		log.Println("RabbitMQ подключается, ожидайте ещё 5 секунд...")
+		time.Sleep(5 * time.Second)
 	}
 
-	conn, err := amqp.Dial(rabbitURL)
 	if err != nil {
 		logger.Fatalf("failed to connect to RabbitMQ: %v", err)
 	}

@@ -42,7 +42,7 @@ func main() {
 
 	// 5. Запуск сервера
 	log.Println("Auth service running on :8080")
-	if err := router.Run(":8088"); err != nil {
+	if err := router.Run(":8080"); err != nil {
 		log.Fatal("Server failed:", err)
 	}
 }
