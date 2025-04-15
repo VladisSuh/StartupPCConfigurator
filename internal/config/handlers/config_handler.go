@@ -110,6 +110,22 @@ func (h *ConfigHandler) UpdateConfig(c *gin.Context) {
 	c.JSON(http.StatusOK, updatedConfig)
 }
 
+// GetCompatibleComponents обрабатывает GET /config/compatible
+func (h *ConfigHandler) GetCompatibleComponents(c *gin.Context) {
+	category := c.Query("category")
+	// Параметры для фильтрации совместимости; если их нет — пустые строки
+	cpuSocket := c.Query("cpuSocket")
+	memoryType := c.Query("memoryType")
+
+	// Вызов сервисного метода для получения совместимых компонентов
+	comps, err := h.service.FetchCompatibleComponents(category, cpuSocket, memoryType)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, comps)
+}
+
 // GetUserConfigs обрабатывает GET /config/userconf
 func (h *ConfigHandler) GetUserConfigs(c *gin.Context) {
 	userId := c.GetString("userId")

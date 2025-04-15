@@ -12,6 +12,7 @@ import (
 // Repository интерфейс
 type ConfigRepository interface {
 	GetComponents(category, search string) ([]domain.Component, error)
+	GetCompatibleComponents(category, cpuSocket, memoryType string) ([]domain.Component, error)
 	CreateConfiguration(userId, name string, components []domain.ComponentRef) (domain.Configuration, error)
 	UpdateConfiguration(userId, configId, name string, comps []domain.ComponentRef) (domain.Configuration, error)
 	GetUserConfigurations(userId string) ([]domain.Configuration, error)
@@ -21,6 +22,60 @@ type ConfigRepository interface {
 // Реализация
 type configRepository struct {
 	db *sql.DB
+}
+
+func (r *configRepository) GetCompatibleComponents(category, cpuSocket, memoryType string) ([]domain.Component, error) {
+	// Начинаем с основного SQL-запроса для выборки компонентов по категории.
+	query := `
+        SELECT id, name, category, brand, specs, created_at, updated_at
+        FROM components
+        WHERE category = $1
+    `
+	args := []interface{}{category}
+
+	// Если задан cpuSocket — добавляем условие для материнских плат,
+	// предполагаем, что в поле specs хранится информация в JSON (например, {"socket": "LGA1200", ...})
+	// или отдельное поле, зависящее от реализации.
+	if cpuSocket != "" {
+		query += ` AND specs->>'socket' = $2`
+		args = append(args, cpuSocket)
+	}
+
+	// Если задан memoryType — добавляем условие для оперативной памяти или материнских плат,
+	// предполагая, что, например, specs->>'memoryType' хранит этот тип
+	if memoryType != "" {
+		if cpuSocket != "" {
+			// $3 если cpuSocket уже задан
+			query += ` AND specs->>'memoryType' = $3`
+		} else {
+			query += ` AND specs->>'memoryType' = $2`
+		}
+		args = append(args, memoryType)
+	}
+
+	rows, err := r.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []domain.Component
+	for rows.Next() {
+		var comp domain.Component
+		if err := rows.Scan(
+			&comp.ID,
+			&comp.Name,
+			&comp.Category,
+			&comp.Brand,
+			&comp.Specs,
+			&comp.CreatedAt,
+			&comp.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		result = append(result, comp)
+	}
+	return result, nil
 }
 
 func NewConfigRepository(db *sql.DB) ConfigRepository {

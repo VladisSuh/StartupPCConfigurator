@@ -16,6 +16,7 @@ var (
 // Интерфейс, который будет использовать хендлер
 type ConfigService interface {
 	FetchComponents(category, search string) ([]domain.Component, error)
+	FetchCompatibleComponents(category, cpuSocket, memoryType string) ([]domain.Component, error)
 	CreateConfiguration(userId, name string, comps []domain.ComponentRef) (domain.Configuration, error)
 	FetchUserConfigurations(userId string) ([]domain.Configuration, error)
 	UpdateConfiguration(userId, configId string, name string, comps []domain.ComponentRef) (domain.Configuration, error)
@@ -25,6 +26,15 @@ type ConfigService interface {
 // Реализация
 type configService struct {
 	repo repository.ConfigRepository
+}
+
+func (s *configService) FetchCompatibleComponents(category, cpuSocket, memoryType string) ([]domain.Component, error) {
+	// Можно реализовать логику совместимости на уровне бизнес-логики.
+	// Например: если запрошена категория "motherboard" и указан cpuSocket,
+	// фильтровать материнские платы по указанному сокету.
+	// В качестве упрощённого варианта сразу перенаправим запрос в репозиторий.
+
+	return s.repo.GetCompatibleComponents(category, cpuSocket, memoryType)
 }
 
 func NewConfigService(r repository.ConfigRepository) ConfigService {

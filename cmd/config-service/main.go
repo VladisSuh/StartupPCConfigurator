@@ -41,6 +41,7 @@ func main() {
 	// 6. Регистрация роутов
 	// Эндпоинты, описанные в openapi.yaml (/config/components и т.д.)
 	r.GET("/config/components", h.GetComponents)
+	r.GET("/config/compatible", h.GetCompatibleComponents)
 	r.POST("/config/newconfig", h.CreateConfig)
 	r.GET("/config/userconf", h.GetUserConfigs)
 	r.PUT("/config/newconfig/:configId", h.UpdateConfig)
