@@ -15,7 +15,7 @@ import (
 
 func main() {
 	// 1. Инициализируем соединение с БД
-	dbURL := "postgres://user:password@localhost:5432/authdb?sslmode=disable"
+	dbURL := "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable"
 	db, err := sql.Open("postgres", dbURL)
 	if err != nil {
 		log.Fatalf("Failed to init DB: %v", err)

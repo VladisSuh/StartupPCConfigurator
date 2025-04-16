@@ -1,0 +1,546 @@
+openapi: 3.0.0
+info:
+  title: PC Configurator API
+  version: '1.0.0'
+  description: |
+    API-сервис для управления конфигурациями ПК и агрегации цен из магазинов.
+
+servers:
+  - url: /api/v1
+
+tags:
+  - name: Auth
+    description: Методы аутентификации/авторизации
+  - name: Configurator
+    description: Методы по работе с конфигурациями ПК
+  - name: Aggregator
+    description: Методы для агрегации предложений магазинов
+  - name: Notifications
+    description: Методы для уведомлений
+
+paths:
+  /auth/register:
+    post:
+      tags:
+        - Auth
+      summary: Регистрация пользователя
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '200':
+          description: Успешная регистрация
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Неверный запрос (валидация)
+        '409':
+          description: Пользователь уже существует
+
+  /auth/login:
+    post:
+      tags:
+        - Auth
+      summary: Логин пользователя
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Успешный логин
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Неверные учётные данные
+
+  /auth/refresh:
+    post:
+      tags:
+        - Auth
+      summary: Обновление токена
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '200':
+          description: Выдача нового accessToken/refreshToken
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Ошибка валидации или невалидный refresh-токен
+
+  /auth/me:
+    get:
+      tags:
+        - Auth
+      summary: Информация о текущем пользователе
+      # Если требуется авторизация:
+      # security:
+      #   - BearerAuth: []
+      responses:
+        '200':
+          description: Данные о текущем пользователе
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          description: Не авторизован
+
+
+  /auth/forgot_password:
+    post:
+      tags:
+        - Auth
+      summary: "Запрос на сброс пароля по email"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        '200':
+          description: "Ссылка на сброс пароля отправлена (или сообщение, что всё ок)"
+        '404':
+          description: "Пользователь не найден (опционально)"
+
+  /auth/reset_password:
+    post:
+      tags:
+        - Auth
+      summary: "Завершение сброса пароля"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reset_token:
+                  type: string
+                  minLength: 10
+                new_password:
+                  type: string
+                  minLength: 8
+      responses:
+        '200':
+          description: "Пароль успешно сброшен"
+        '401':
+          description: "Токен просрочен/недействителен"
+
+  /auth/verify_email:
+    post:
+      tags:
+        - Auth
+      summary: "Подтверждение email пользователя"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                verification_code:
+                  type: string
+      responses:
+        '200':
+          description: "Email подтвержден"
+        '400':
+          description: "Неверный код подтверждения"
+        '404':
+          description: "Пользователь не найден"
+
+  # ----------------------------
+  # CONFIGURATOR ENDPOINTS
+  # ----------------------------
+  /config/components:
+    get:
+      tags:
+        - Configurator
+      summary: Список компонентов
+      description: Получение списка компонентов с фильтрацией по категории или поисковому запросу
+      parameters:
+        - in: query
+          name: category
+          schema:
+            type: string
+          description: Фильтр по категории (cpu, gpu, motherboard, ram, storage, cooler, case, soundcard, power_supply)
+        - in: query
+          name: search
+          schema:
+            type: string
+          description: Поиск по названию/артикулу
+      responses:
+        '200':
+          description: Список компонентов
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Component'
+        '401':
+          description: Не авторизован (если требуется)
+
+  /config/compatible:
+    get:
+      tags:
+        - Configurator
+      summary: Получить список совместимых компонентов
+      description: |
+        Возвращает список компонентов для заданной категории,
+        совместимых с уже выбранными компонентами.
+        Например, если выбран процессор с сокетом LGA1200,
+        возвращает материнские платы, поддерживающие этот сокет.
+      parameters:
+        - in: query
+          name: category
+          required: true
+          schema:
+            type: string
+          description: Категория компонентов, для которых ищутся совместимые варианты ("motherboard", "ram", "cpu").
+        - in: query
+          name: cpuSocket
+          required: false
+          schema:
+            type: string
+          description: Сокет выбранного процессора. Используется для фильтрации материнских плат.
+        - in: query
+          name: memoryType
+          required: false
+          schema:
+            type: string
+          description: Тип оперативной памяти (например, "DDR4"). Может применяться для фильтрации материнских плат или модулей оперативной памяти.
+        # Можно добавить дополнительные параметры для других зависимостей (например, поддерживаемые интерфейсы для накопителей)
+      responses:
+        '200':
+          description: Список совместимых компонентов найден
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Component'
+        '400':
+          description: Неверные параметры запроса
+
+  /config/newconfig:
+    post:
+      tags:
+        - Configurator
+      summary: Создать новую конфигурацию
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateConfigRequest'
+      responses:
+        '201':
+          description: Конфигурация успешно создана
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Configuration'
+        '400':
+          description: Ошибка валидации (неверные данные)
+        '401':
+          description: Не авторизован
+
+  /config/userconf:
+    get:
+      tags:
+        - Configurator
+      summary: Получить список конфигураций пользователя
+      responses:
+        '200':
+          description: Список конфигураций
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Configuration'
+        '401':
+          description: Не авторизован
+
+  /config/newconfig/{configId}:
+    put:
+      tags:
+        - Configurator
+      summary: Обновить конфигурацию
+      parameters:
+        - in: path
+          name: configId
+          required: true
+          schema:
+            type: string
+          description: ID конфигурации
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateConfigRequest'
+      responses:
+        '200':
+          description: Конфигурация обновлена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Configuration'
+        '400':
+          description: Ошибка валидации
+        '401':
+          description: Не авторизован
+        '404':
+          description: Конфигурация не найдена
+    delete:
+      tags:
+        - Configurator
+      summary: Удалить конфигурацию
+      description: Удаляет конфигурацию (сборку) по указанному идентификатору
+      parameters:
+        - in: path
+          name: configId
+          required: true
+          schema:
+            type: string
+          description: ID конфигурации для удаления
+      responses:
+        '204':
+          description: Конфигурация успешно удалена (No Content)
+        '401':
+          description: Не авторизован
+        '403':
+          description: Пользователь не является владельцем этой конфигурации
+        '404':
+          description: Конфигурация не найдена
+
+  # ----------------------------
+  # AGGREGATOR ENDPOINTS
+  # ----------------------------
+  /offers:
+    get:
+      tags:
+        - Aggregator
+      summary: Список предложений (оферт) по конкретному компоненту
+      parameters:
+        - in: query
+          name: componentId
+          schema:
+            type: string
+          required: true
+          description: ID компонента, по которому ищем предложения
+        - in: query
+          name: sort
+          schema:
+            type: string
+          description: Тип сортировки (priceAsc, priceDesc, rating и т.п.)
+      responses:
+        '200':
+          description: Массив предложений
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OffersResponse'
+        '400':
+          description: Ошибка валидации (например, отсутсвует componentId)
+
+components:
+  schemas:
+    # -------- Auth Schemas --------
+    RegisterRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+        name:
+          type: string
+      required:
+        - email
+        - password
+
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+      required:
+        - email
+        - password
+
+    RefreshRequest:
+      type: object
+      properties:
+        refreshToken:
+          type: string
+      required:
+        - refreshToken
+
+    AuthResponse:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+        accessToken:
+          type: string
+
+    # -------- Common User --------
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+
+    # -------- Configurator Schemas --------
+    Component:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        category:
+          type: string
+        brand:
+          type: string
+        specs:
+          type: object
+          additionalProperties: true
+
+    CreateConfigRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        components:
+          type: array
+          items:
+            $ref: '#/components/schemas/ComponentRef'
+      required:
+        - name
+        - components
+
+    UpdateConfigRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        components:
+          type: array
+          items:
+            $ref: '#/components/schemas/ComponentRef'
+      required:
+        - components
+
+    Configuration:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        ownerId:
+          type: string
+        components:
+          type: array
+          items:
+            $ref: '#/components/schemas/ComponentRef'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ComponentRef:
+      type: object
+      properties:
+        category:
+          type: string
+        componentId:
+          type: string
+
+    # -------- Aggregator Schemas --------
+    Offer:
+      type: object
+      properties:
+        shopId:
+          type: string
+        shopName:
+          type: string
+        price:
+          type: number
+        currency:
+          type: string
+        availability:
+          type: string
+        url:
+          type: string
+
+    OffersResponse:
+      type: object
+      properties:
+        componentId:
+          type: string
+        offers:
+          type: array
+          items:
+            $ref: '#/components/schemas/Offer'
+
+    # -------- Notifications (пример, если нужно) --------
+    Notification:
+      type: object
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        title:
+          type: string
+        message:
+          type: string
+        isRead:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time

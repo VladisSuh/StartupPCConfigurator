@@ -87,20 +87,25 @@ func NewConfigRepository(db *sql.DB) ConfigRepository {
 func (r *configRepository) GetComponents(category, search string) ([]domain.Component, error) {
 	// SQL-запрос; учтите, что если это PostgreSQL — придётся использовать $1, $2 вместо ?
 	query := `
-        SELECT id, name, category, brand, specs, created_at, updated_at
-        FROM components
-        WHERE 1=1
-    `
-	var args []interface{}
+    SELECT id, name, category, brand, specs, created_at, updated_at
+    FROM components
+    WHERE 1=1
+`
+	var (
+		args  []interface{}
+		index int = 1 // счётчик placeholder'ов
+	)
 
 	if category != "" {
-		query += ` AND category = ?`
+		query += fmt.Sprintf(" AND category = $%d", index)
 		args = append(args, category)
+		index++
 	}
 	if search != "" {
-		query += ` AND (LOWER(name) LIKE ? OR LOWER(brand) LIKE ?)`
+		query += fmt.Sprintf(" AND (LOWER(name) LIKE $%d OR LOWER(brand) LIKE $%d)", index, index+1)
 		searchLike := "%" + search + "%"
 		args = append(args, searchLike, searchLike)
+		index += 2
 	}
 
 	rows, err := r.db.Query(query, args...)
