@@ -62,13 +62,16 @@ var (
 )
 
 type Offer struct {
+	ID           int64   `json:"-"`
 	ComponentID  string  `json:"componentId"`
 	ShopID       string  `json:"shopId"`
+	ShopCode     int64   `json:"shopCode"`
 	ShopName     string  `json:"shopName"`
 	Price        float64 `json:"price"`
 	Currency     string  `json:"currency"`
 	Availability string  `json:"availability"`
 	URL          string  `json:"url"`
+	FetchedAt    string  `json:"fetchedAt"`
 }
 
 // OffersFilter описывает фильтры/параметры для запроса

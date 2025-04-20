@@ -1,82 +1,188 @@
 package repository
 
 import (
+	"StartupPCConfigurator/internal/aggregator/usecase"
 	"context"
 	"database/sql"
-	_ "fmt"
 
 	_ "github.com/lib/pq" // драйвер PostgreSQL
 
 	"StartupPCConfigurator/internal/domain"
 )
 
-type offersRepository struct {
+// repoImpl — один единственный репозиторий, реализующий оба набора методов
+type repoImpl struct {
 	db *sql.DB
 }
 
-// Интерфейс, на который ссылается usecase
-type OffersRepository interface {
-	FetchOffers(ctx context.Context, filter domain.OffersFilter) ([]domain.Offer, error)
-}
-
-// Конструктор
-func NewOffersRepository(connStr string) (OffersRepository, error) {
+// NewRepository открывает соединение и возвращает *repoImpl
+func NewRepository(connStr string) (*repoImpl, error) {
 	db, err := sql.Open("postgres", connStr)
 	if err != nil {
 		return nil, err
 	}
-	// Проверить подключение, опционально
 	if err = db.Ping(); err != nil {
 		return nil, err
 	}
-	return &offersRepository{db: db}, nil
+	return &repoImpl{db: db}, nil
 }
 
-func (r *offersRepository) FetchOffers(ctx context.Context, filter domain.OffersFilter) ([]domain.Offer, error) {
-	// Пример простого запроса
-	// Предположим, таблица "offers" хранит (component_id, shop_id, price, availability, etc.)
-	query := `
-        SELECT shop_id, shop_name, price, currency, availability, url
-        FROM offers
-        WHERE component_id = $1
-    `
-	args := []interface{}{filter.ComponentID}
+// ----------------------
+// Методы для HTTP‑usecase
+// ----------------------
 
-	// Примитивная логика сортировки
-	if filter.Sort == "priceAsc" {
-		query += " ORDER BY price ASC"
-	} else if filter.Sort == "priceDesc" {
-		query += " ORDER BY price DESC"
+// FetchOffers реализует usecase.OffersRepository и возвращает список офферов
+func (r *repoImpl) FetchOffers(ctx context.Context, filter domain.OffersFilter) ([]domain.Offer, error) {
+	const q = `
+SELECT
+    o.component_id,
+    o.shop_id,
+    s.code   AS shop_code,
+    s.name   AS shop_name,
+    o.price,
+    o.currency,
+    o.availability,
+    o.url,
+    o.fetched_at
+FROM offers o
+JOIN shops s ON s.id = o.shop_id
+WHERE o.component_id = $1
+`
+	// Добавляем сортировку
+	query := q
+	switch filter.Sort {
+	case "priceAsc":
+		query += " ORDER BY o.price ASC"
+	case "priceDesc":
+		query += " ORDER BY o.price DESC"
+	default:
+		query += " ORDER BY s.name"
 	}
 
-	rows, err := r.db.QueryContext(ctx, query, args...)
+	rows, err := r.db.QueryContext(ctx, query, filter.ComponentID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var result []domain.Offer
+	var out []domain.Offer
 	for rows.Next() {
-		var offer domain.Offer
-		err := rows.Scan(
-			&offer.ShopID,
-			&offer.ShopName,
-			&offer.Price,
-			&offer.Currency,
-			&offer.Availability,
-			&offer.URL,
-		)
-		if err != nil {
+		var of domain.Offer
+		of.ComponentID = filter.ComponentID
+		if err := rows.Scan(
+			&of.ComponentID,
+			&of.ShopID,
+			&of.ShopCode,
+			&of.ShopName,
+			&of.Price,
+			&of.Currency,
+			&of.Availability,
+			&of.URL,
+			&of.FetchedAt,
+		); err != nil {
 			return nil, err
 		}
-		// componentId тоже можно добавлять, если нужно в ответе
-		offer.ComponentID = filter.ComponentID
-
-		result = append(result, offer)
+		out = append(out, of)
 	}
-	if rows.Err() != nil {
-		return nil, rows.Err()
+	return out, rows.Err()
+}
+
+// ---------------------------
+// Методы для Update‑UseCase
+// ---------------------------
+
+// ShopComponent — пара component_id + URL страницы
+// нужен для usecase.Repository
+type ShopComponent struct {
+	ComponentID string
+	URL         string
+}
+
+// ListShopComponents возвращает все componentID+URL для shopID
+func (r *repoImpl) ListShopComponents(ctx context.Context, shopID int64) ([]usecase.ShopComponent, error) {
+	const q = `
+SELECT component_id, url
+FROM shop_components
+WHERE shop_id = $1
+`
+	rows, err := r.db.QueryContext(ctx, q, shopID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var res []usecase.ShopComponent
+	for rows.Next() {
+		var sc usecase.ShopComponent
+		if err := rows.Scan(&sc.ComponentID, &sc.URL); err != nil {
+			return nil, err
+		}
+		res = append(res, sc)
+	}
+	return res, rows.Err()
+}
+
+// UpsertOffer вставляет или обновляет запись в offers
+func (r *repoImpl) UpsertOffer(ctx context.Context,
+	compID string, shopID int64,
+	price float64, availability, url string,
+) error {
+	const q = `
+INSERT INTO offers
+  (component_id, shop_id, price, currency, availability, url, fetched_at)
+VALUES ($1,$2,$3,$4,$5,$6,NOW())
+ON CONFLICT (component_id, shop_id) DO UPDATE
+  SET price        = EXCLUDED.price,
+      currency     = EXCLUDED.currency,
+      availability = EXCLUDED.availability,
+      url          = EXCLUDED.url,
+      fetched_at   = EXCLUDED.fetched_at
+`
+	_, err := r.db.ExecContext(ctx, q,
+		compID, shopID, price, "USD", availability, url,
+	)
+	return err
+}
+
+// InsertPriceHistory пишет запись в price_history
+func (r *repoImpl) InsertPriceHistory(ctx context.Context,
+	compID string, shopID int64, price float64,
+) error {
+	const q = `
+INSERT INTO price_history
+  (component_id, shop_id, price, currency, captured_at)
+VALUES ($1,$2,$3,$4,NOW())
+`
+	_, err := r.db.ExecContext(ctx, q, compID, shopID, price, "USD")
+	return err
+}
+
+// UpdateJobStatus обновляет статус задачи в update_jobs
+func (r *repoImpl) UpdateJobStatus(ctx context.Context,
+	jobID int64, status string, message interface{},
+) error {
+	var q string
+	var args []interface{}
+
+	if status == "running" {
+		q = `
+UPDATE update_jobs
+   SET status     = $2,
+       started_at = NOW()
+ WHERE id = $1
+`
+		args = []interface{}{jobID, status}
+	} else {
+		q = `
+UPDATE update_jobs
+   SET status      = $2,
+       finished_at = NOW(),
+       message     = $3
+ WHERE id = $1
+`
+		args = []interface{}{jobID, status, message}
 	}
 
-	return result, nil
+	_, err := r.db.ExecContext(ctx, q, args...)
+	return err
 }
