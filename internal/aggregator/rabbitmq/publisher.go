@@ -15,6 +15,10 @@ type AggregatorPublisher struct {
 	exName string // имя обменника, если используете Exchange
 }
 
+type Publisher interface {
+	PublishPriceChanged(componentID string, shopID int64, price float64) error
+}
+
 // NewAggregatorPublisher — конструктор
 func NewAggregatorPublisher(ch *amqp.Channel, logger *log.Logger, exName string) *AggregatorPublisher {
 	return &AggregatorPublisher{
@@ -52,4 +56,35 @@ func (p *AggregatorPublisher) PublishPriceUpdated(shopID string, componentID str
 	}
 	p.logger.Printf("Sent price_updated event for shop=%s component=%s", shopID, componentID)
 	return nil
+}
+
+func (p *AggregatorPublisher) PublishPriceChanged(
+	componentID string,
+	shopID int64,
+	price float64,
+) error {
+	// Собираем структуру, совпадающую с JSON-схемой
+	evt := struct {
+		ComponentID string  `json:"componentId"`
+		ShopID      int64   `json:"shopId"`
+		Price       float64 `json:"price"`
+	}{
+		ComponentID: componentID,
+		ShopID:      shopID,
+		Price:       price,
+	}
+	body, err := json.Marshal(evt)
+	if err != nil {
+		return err
+	}
+	// Публикуем в ту же очередь / exchange, где слушает Notifications Service
+	return p.ch.Publish(
+		p.exName,        // exchange
+		"price.changed", // routing key
+		false, false,
+		amqp.Publishing{
+			ContentType: "application/json",
+			Body:        body,
+		},
+	)
 }

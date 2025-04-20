@@ -8,58 +8,37 @@ import (
 	"github.com/streadway/amqp"
 
 	"StartupPCConfigurator/internal/aggregator/usecase"
-	"StartupPCConfigurator/internal/domain"
 )
 
-// StartAggregatorConsumer — пример подписчика, который слушает очередь "aggregator_update"
-// и при получении сообщения запускает какую-то логику (например, обновить каталог).
-func StartAggregatorConsumer(ch *amqp.Channel, offersUC usecase.OffersUseCase, logger *log.Logger) error {
-	// 1. Объявляем очередь (если её нет, RabbitMQ создаст)
-	q, err := ch.QueueDeclare(
-		"aggregator_update", // имя очереди
-		true,                // durable
-		false,               // autoDelete
-		false,               // exclusive
-		false,               // noWait
-		nil,                 // аргументы
-	)
+// Предположим, у вас в usecase определена структура:
+//
+//	type ShopUpdateMsg struct { JobID, ShopID int64; Type string }
+//
+// или что‑то подобное.
+// Если она в другом пакете — поправьте импорт.
+type ShopUpdateMsg = usecase.ShopUpdateMsg
+
+// StartAggregatorConsumer слушает очередь "shop_update" и вызывает ProcessShopUpdate
+func StartAggregatorConsumer(
+	ch *amqp.Channel,
+	updUC usecase.UpdateUseCase, // <— теперь UpdateUseCase
+	logger *log.Logger,
+) error {
+	q, err := ch.QueueDeclare("shop_update", true, false, false, false, nil)
 	if err != nil {
 		return err
 	}
 
-	// 2. Подписываемся на очередь
-	msgs, err := ch.Consume(
-		q.Name,
-		"",    // consumer
-		true,  // autoAck (для упрощения)
-		false, // exclusive
-		false, // noLocal
-		false, // noWait
-		nil,   // arguments
-	)
+	msgs, err := ch.Consume(q.Name, "", true, false, false, false, nil)
 	if err != nil {
 		return err
 	}
 
-	// 3. Запускаем цикл чтения сообщений
-	logger.Println("Aggregator consumer is running, waiting for messages...")
+	logger.Println("Shop‑update consumer running...")
 	for d := range msgs {
-		// d.Body — []byte
-		logger.Printf("Received message: %s", string(d.Body))
-
-		// Допустим, у нас JSON-структура:
-		var event domain.UpdateEvent
-		if err := json.Unmarshal(d.Body, &event); err != nil {
-			logger.Printf("Error unmarshalling message: %v", err)
-			continue
-		}
-
-		// Вызываем бизнес-логику в usecase — напр., запустить обновление
-		// Здесь можно передать context с таймаутом
-		ctx := context.Background()
-		if err := offersUC.ProcessUpdateEvent(ctx, event); err != nil {
-			logger.Printf("Error processing update event: %v", err)
-		}
+		var msg usecase.ShopUpdateMsg
+		json.Unmarshal(d.Body, &msg)
+		updUC.ProcessShopUpdate(context.Background(), msg.JobID, msg.ShopID)
 	}
 	return nil
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"StartupPCConfigurator/internal/aggregator/handlers"
+	"StartupPCConfigurator/internal/aggregator/parser/dns"
 	"StartupPCConfigurator/internal/aggregator/repository"
 	"StartupPCConfigurator/internal/aggregator/usecase"
 	// например, "_ github.com/lib/pq" если нужно драйвер для PostgreSQL
@@ -21,16 +22,21 @@ func main() {
 
 	// === 1. Подключение к БД (как раньше) ===
 	dbConnStr := os.Getenv("DB_CONN_STR")
-	if dbConnStr == "" {
-		dbConnStr = "postgres://postgres:newpassword@localhost:5432/postgres?sslmode=disable"
+	for i := 0; i < 3; i++ {
+		if dbConnStr == "" {
+			dbConnStr = "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable"
+		}
+		log.Println("Postgres подключается, ожидайте ещё 5 секунд...")
+		time.Sleep(5 * time.Second)
 	}
-	repo, err := repository.NewOffersRepository(dbConnStr)
+	repo, err := repository.NewRepository(dbConnStr)
 	if err != nil {
 		logger.Fatalf("Error creating repository: %v", err)
 	}
 
-	// === 2. Инициализация UseCase ===
-	offersUC := usecase.NewOffersUseCase(repo, logger)
+	// === 2. Инициализация HTTP‑UseCase и Handler ===
+	offersUC := usecase.NewOffersUseCase(repo)
+	offersHandler := handlers.NewOffersHandler(offersUC)
 
 	// === 3. Подключение к RabbitMQ ===
 	var conn *amqp.Connection
@@ -60,19 +66,23 @@ func main() {
 	}
 	defer ch.Close()
 
-	// === 4. Инициализация Consumer’а (подписчика) ===
+	// === 4. Инициализация Parser, Publisher и Update‑UseCase ===
+	// DNS‑парсер
+	dnsParser := dns.NewDNSParser(logger)
+	// RabbitMQ‑publisher
+	publisher := rabbitmq.NewAggregatorPublisher(ch, logger, "") // пустой exchange → direct
+	// Update‑UseCase, который обрабатывает очередь shop_update
+	updateUC := usecase.NewUpdateUseCase(repo, publisher, dnsParser, logger)
+
+	// === 5. Старт Consumer’а в фоне ===
 	go func() {
-		// например, объявим очередь aggregator_update, которую будем слушать
-		err := rabbitmq.StartAggregatorConsumer(ch, offersUC, logger)
-		if err != nil {
-			logger.Fatalf("consumer error: %v", err)
+		if err := rabbitmq.StartAggregatorConsumer(ch, updateUC, logger); err != nil {
+			logger.Fatalf("Consumer error: %v", err)
 		}
 	}()
 
-	// === 5. Инициализация HTTP-сервера ===
+	// === 6. Запуск HTTP‑сервера ===
 	r := gin.Default()
-
-	offersHandler := handlers.NewOffersHandler(offersUC)
 	r.GET("/offers", offersHandler.GetOffers)
 
 	port := os.Getenv("AGGREGATOR_PORT")
