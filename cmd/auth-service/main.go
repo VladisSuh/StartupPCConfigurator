@@ -4,6 +4,8 @@ import (
 	"StartupPCConfigurator/internal/auth/handlers"
 	"StartupPCConfigurator/internal/auth/repository"
 	"StartupPCConfigurator/internal/auth/service"
+	"StartupPCConfigurator/pkg/middleware"
+
 	"database/sql"
 	"log"
 
@@ -30,19 +32,27 @@ func main() {
 
 	// 4. Настройка роутера (с использованием Gin)
 	router := gin.Default()
-	authGroup := router.Group("/auth")
+	authGroup := router.Group("/")
 	{
 		authGroup.POST("/register", handler.Register)
 		authGroup.POST("/login", handler.Login)
-		authGroup.GET("/me", handler.Me)
+		authGroup.POST("/refresh", handler.Refresh)
 		authGroup.POST("/forgot_password", handler.ForgotPassword)
 		authGroup.POST("/reset_password", handler.ResetPassword)
 		authGroup.POST("/verify_email", handler.VerifyEmail)
+
+		// Защищённые (требуют access_token)
+		authGroup.Use(middleware.AuthMiddleware(jwtSecret))
+		{
+			authGroup.GET("/me", handler.Me)
+			authGroup.POST("/logout", handler.Logout)
+			authGroup.DELETE("/delete", handler.DeleteAccount)
+		}
 	}
 
 	// 5. Запуск сервера
-	log.Println("Auth service running on :8080")
-	if err := router.Run(":8080"); err != nil {
+	log.Println("Auth service running on :8001")
+	if err := router.Run(":8001"); err != nil {
 		log.Fatal("Server failed:", err)
 	}
 }

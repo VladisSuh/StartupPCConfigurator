@@ -2,10 +2,11 @@ package main
 
 import (
 	"StartupPCConfigurator/internal/aggregator/rabbitmq"
-	"github.com/streadway/amqp"
 	"log"
 	"os"
 	"time"
+
+	"github.com/streadway/amqp"
 
 	"github.com/gin-gonic/gin"
 
@@ -21,7 +22,7 @@ func main() {
 	// === 1. Подключение к БД (как раньше) ===
 	dbConnStr := os.Getenv("DB_CONN_STR")
 	if dbConnStr == "" {
-		dbConnStr = "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable"
+		dbConnStr = "postgres://postgres:newpassword@localhost:5432/postgres?sslmode=disable"
 	}
 	repo, err := repository.NewOffersRepository(dbConnStr)
 	if err != nil {
@@ -76,7 +77,7 @@ func main() {
 
 	port := os.Getenv("AGGREGATOR_PORT")
 	if port == "" {
-		port = "8082"
+		port = "8003"
 	}
 	logger.Printf("Aggregator service running on port %s", port)
 	if err := r.Run(":" + port); err != nil {

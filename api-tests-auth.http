@@ -1,0 +1,182 @@
+@auth_host = http://localhost:8080
+@config_host = http://localhost:8080
+
+
+@email     = krasina_2003@mail.ru
+
+################################################################################
+### 1. регистрация
+POST {{auth_host}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "password123",
+  "name": "Angelika"
+}
+
+################################################################################
+### 2. логин
+POST {{auth_host}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "password123"
+}
+
+### ↓ после выполнения скопируйте токены из ответа: ###########################
+#   "token": {                          <‑‑‑ access / refresh внутри
+#       "access_token":  "...",
+#       "refresh_token": "...",
+#       "expires_at":   "..."
+#   }
+################################################################################
+@access_token  = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImtyYXNpbmFfMjAwM0BtYWlsLnJ1IiwiZXhwIjoxNzQ1MjY5MDIzLCJ1c2VyX2lkIjoiZjVhM2EyODQtYzZiMS00NWFkLWIyZjUtYTQ4MDRkNzRlYTFmIn0.SZIa5msMKheiJx_6EcIQmXy8YwulxlH75uP2YGCJm-k
+
+@refresh_token = SGppWH0uFI3Iz5Y6Hpk3HgTQs4stSF7aR0cd32XK_LulHcJ1OE8Z9Lf_Enm-bBBFy3qR_k-4ePUUZb_JCaWCKQ==
+
+################################################################################
+### 3. вызов /auth/me (проверяем access‑token)
+GET {{auth_host}}/auth/me
+Authorization: Bearer {{access_token}}
+
+################################################################################
+### 4. обновление токена
+POST {{auth_host}}/auth/refresh
+Content-Type: application/json
+
+{
+  "refresh_token": "{{refresh_token}}"
+}
+
+# скопируйте новые access/refresh‑token’ы, если нужны
+
+################################################################################
+### 5. запрос на сброс пароля
+POST {{auth_host}}/auth/forgot_password
+Content-Type: application/json
+
+{
+  "email": "{{email}}"
+}
+
+# в письме/логе будет ссылка вида
+# http://localhost:8080/auth/reset_password?token=XYZ
+# скопируйте значение XYZ:
+
+@reset_token =  0b9oVFmMCZW0lyfZCfrhZfBfH8sUQjexmNu17wdun8Y=
+
+################################################################################
+### 6. завершение сброса пароля
+POST {{auth_host}}/auth/reset_password
+Content-Type: application/json
+
+{
+  "reset_token": "{{reset_token}}",
+  "new_password": "newpassword123"
+}
+
+################################################################################
+### 7. логин новым паролем
+POST {{auth_host}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "newpassword123"
+}
+
+################################################################################
+### 8. подтверждение e‑mail (если у вас есть код)
+POST {{auth_host}}/auth/verify_email
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "verification_code": "Dq0fTJtg"
+}
+
+################################################################################
+### 9. выход (logout)
+POST {{auth_host}}/auth/logout
+Authorization: Bearer {{access_token}}
+
+
+################################################################################
+### 10. удаление аккаунта (DELETE) — работает через access_token
+DELETE {{auth_host}}/auth/delete
+Authorization: Bearer {{access_token}}
+
+### 11. получить список компонентов
+GET {{config_host}}/config/components
+# Авторизация не обязательна, но можно передать токен для трассировки
+# Authorization: Bearer {{access_token}}
+
+### 11.1 получить компоненты по категории
+GET {{config_host}}/config/components?category=GPU
+Authorization: Bearer {{access_token}}
+
+### 11.2 поиск компонентов по названию
+GET {{config_host}}/config/components?search=ryzen
+Authorization: Bearer {{access_token}}
+
+################################################################################
+### 12. создание конфигурации
+@config_name = My First PC Build
+
+POST {{config_host}}/config/newconfig
+Content-Type: application/json
+Authorization: Bearer {{access_token}}
+
+{
+  "name": "{{config_name}}",
+  "components": [
+    {
+      "category": "CPU",
+      "name": "AMD Ryzen 5 5600X"
+    },
+    {
+      "category": "GPU",
+      "name": "NVIDIA RTX 3060"
+    }
+  ]
+}
+
+### ↓ после выполнения скопируйте поле id конфигурации ########################
+@config_id = 4
+
+################################################################################
+### 13. обновление конфигурации
+PUT {{config_host}}/config/newconfig/{{config_id}}
+Content-Type: application/json
+Authorization: Bearer {{access_token}}
+
+{
+  "name": "Updated PC Build",
+  "components": [
+    {
+      "category": "CPU",
+      "name": "Intel Core i5-12400F"
+    },
+    {
+      "category": "GPU",
+      "name": "AMD RX 6600 XT"
+    }
+  ]
+}
+
+################################################################################
+### 14. получить совместимые компоненты
+GET {{config_host}}/config/compatible?category=Motherboard&cpuSocket=AM5&memoryType=DDR5
+Authorization: Bearer {{access_token}}
+
+################################################################################
+### 15. получить конфигурации пользователя
+GET {{config_host}}/config/userconf
+Authorization: Bearer {{access_token}}
+
+################################################################################
+### 16. удалить конфигурацию
+DELETE {{config_host}}/config/newconfig/{{config_id}}
+Authorization: Bearer {{access_token}}

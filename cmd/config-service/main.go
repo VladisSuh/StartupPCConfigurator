@@ -8,6 +8,8 @@ import (
 	"StartupPCConfigurator/internal/config/handlers"
 	"StartupPCConfigurator/internal/config/repository"
 	"StartupPCConfigurator/internal/config/usecase"
+	"StartupPCConfigurator/pkg/middleware"
+
 	"github.com/gin-gonic/gin"
 	_ "github.com/lib/pq"
 	// Подключения для БД, миграций и т.д.
@@ -31,21 +33,22 @@ func main() {
 	// 4. Создаём Gin-роутер
 	r := gin.Default()
 
-	// Можно добавить middleware для логирования, CORS, авторизации:
-	// r.Use(CORSMiddleware(), AuthMiddleware(), ...)
-
-	// 5. Инициализируем хендлеры (можно одним объектом или несколькими)
-	// Здесь передаём сервис (бизнес-логику) в конструктор хендлера
+	// 5. Подключаем middleware
+	auth := middleware.AuthMiddleware("secret_key")
 	h := handlers.NewConfigHandler(service)
 
-	// 6. Регистрация роутов
-	// Эндпоинты, описанные в openapi.yaml (/config/components и т.д.)
-	r.GET("/config/components", h.GetComponents)
-	r.GET("/config/compatible", h.GetCompatibleComponents)
-	r.POST("/config/newconfig", h.CreateConfig)
-	r.GET("/config/userconf", h.GetUserConfigs)
-	r.PUT("/config/newconfig/:configId", h.UpdateConfig)
-	r.DELETE("/config/newconfig/:configId", h.DeleteConfig)
+	// 6. Публичные ручки
+	r.GET("/components", h.GetComponents)
+	r.GET("/compatible", h.GetCompatibleComponents)
+
+	// 7. Защищённые ручки
+	api := r.Group("/", auth)
+	{
+		api.POST("/newconfig", h.CreateConfig)
+		api.GET("/userconf", h.GetUserConfigs)
+		api.PUT("/newconfig/:configId", h.UpdateConfig)
+		api.DELETE("/newconfig/:configId", h.DeleteConfig)
+	}
 
 	// 7. Запуск сервера на порте (например, 8081)
 	port := os.Getenv("CONFIG_SERVICE_PORT")

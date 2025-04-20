@@ -3,11 +3,13 @@ package domain
 import (
 	"errors"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 // User — основная модель пользователя
 type User struct {
-	ID                    uint      `json:"id"`
+	ID                    uuid.UUID `json:"id"`
 	Email                 string    `json:"email"`
 	EmailVerified         bool      `json:"email_verified"`
 	VerificationCode      string    `json:"-"`
@@ -41,8 +43,8 @@ type Component struct {
 
 // Это то, что мы получаем в CreateConfigRequest/UpdateConfigRequest
 type ComponentRef struct {
-	Category    string `json:"category"`
-	ComponentID string `json:"componentId"`
+	Category string `json:"category"`
+	Name     string `json:"name"`
 }
 
 // Структура «Конфигурация» (сборка)
@@ -53,7 +55,7 @@ type Configuration struct {
 	Components []ComponentRef // не обязательно хранить здесь, т.к. в БД связь через configuration_components
 	CreatedAt  time.Time      `db:"created_at"`
 	UpdatedAt  time.Time      `db:"updated_at"`
-	OwnerID    string
+	OwnerID    uuid.UUID
 }
 
 var (
@@ -81,4 +83,14 @@ type UpdateEvent struct {
 	ShopID   string `json:"shopId"`
 	Action   string `json:"action"`
 	Metadata string `json:"metadata"`
+}
+
+type CompatibilityFilter struct {
+	Category       string  // например "motherboard"
+	CPUSocket      string  // например "AM4"
+	RAMType        string  // например "DDR4"
+	FormFactor     string  // например "ATX"
+	GPULengthMM    float64 // например 300.0
+	CoolerHeightMM float64 // например 160.0
+	PowerRequired  float64 // для GPU (в ваттах)
 }

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -19,11 +20,12 @@ type AuthService interface {
 	Register(email, password, name string) (*domain.User, *domain.Token, error)
 	Login(email, password string) (*domain.Token, error)
 	Refresh(refreshToken string) (*domain.Token, error)
-	GetUserByID(userID uint) (*domain.User, error)
+	GetUserByID(userID uuid.UUID) (*domain.User, error)
 	ForgotPassword(email string) error
 	ResetPassword(resetToken string, newPassword string) error
 	VerifyEmail(email, verificationCode string) error
-	Logout(userID uint) error
+	Logout(userID uuid.UUID) error
+	DeleteAccount(userID uuid.UUID) error
 }
 
 // authServiceImpl — реализация AuthService
@@ -54,14 +56,23 @@ func (s *authServiceImpl) Register(email, password, name string) (*domain.User, 
 	if err != nil {
 		return nil, nil, err
 	}
+	verificationCode, err := generateRandomToken(6)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	user := &domain.User{
-		Email:        email,
-		PasswordHash: string(hashed),
-		Name:         name,
-		CreatedAt:    time.Now(),
+		Email:            email,
+		PasswordHash:     string(hashed),
+		Name:             name,
+		CreatedAt:        time.Now(),
+		VerificationCode: verificationCode,
 	}
 	if err := s.userRepo.Create(user); err != nil {
+		return nil, nil, err
+	}
+
+	if err := SendVerificationCodeToEmail(user.Email, verificationCode); err != nil {
 		return nil, nil, err
 	}
 
@@ -116,7 +127,7 @@ func (s *authServiceImpl) Login(email, password string) (*domain.Token, error) {
 // generateToken - создает JWT
 func (s *authServiceImpl) generateToken(user *domain.User) (*domain.Token, error) {
 	claims := jwt.MapClaims{
-		"user_id": user.ID,
+		"user_id": user.ID.String(),
 		"email":   user.Email,
 		"exp":     time.Now().Add(24 * time.Hour).Unix(),
 	}
@@ -188,15 +199,15 @@ func (s *authServiceImpl) ForgotPassword(email string) error {
 		return err
 	}
 
-	resetLink := "https://yourfrontend.com/reset-password?token=" + resetToken
+	resetLink := "http://localhost:8080/auth/reset_password?token=" + resetToken
 	return SendResetLinkToEmail(user.Email, resetLink)
 }
 
 // SendResetLinkToEmail - отправляет письмо на email
 func SendResetLinkToEmail(email, resetLink string) error {
-	from := "uconf@mail.ru"
-	password := "yourconfigurate1"
-	smtpServer := "smtp.mail.ru"
+	from := "yourconfigurator@gmail.com"
+	password := "gzrn jglq tcjq szon"
+	smtpServer := "smtp.gmail.com"
 	smtpPort := "587" //по стандарту
 	to := []string{email}
 	subject := "Восстановление пароля"
@@ -210,6 +221,21 @@ func SendResetLinkToEmail(email, resetLink string) error {
 		return err
 	}
 	return nil
+}
+
+func SendVerificationCodeToEmail(email, code string) error {
+	from := "yourconfigurator@gmail.com"
+	password := "gzrn jglq tcjq szon"
+	smtpServer := "smtp.gmail.com"
+	smtpPort := "587"
+
+	to := []string{email}
+	subject := "Подтверждение регистрации"
+	body := fmt.Sprintf("Ваш код подтверждения email: %s", code)
+	message := []byte(fmt.Sprintf("Subject: %s\r\n\r\n%s", subject, body))
+
+	auth := smtp.PlainAuth("", from, password, smtpServer)
+	return smtp.SendMail(smtpServer+":"+smtpPort, auth, from, to, message)
 }
 
 // ResetPassword - устанавливает новый пароль
@@ -244,6 +270,11 @@ func (s *authServiceImpl) VerifyEmail(email, verificationCode string) error {
 		return errors.New("user not found")
 	}
 
+	fmt.Println("From client:", verificationCode)
+	fmt.Println("From DB:    ", user.VerificationCode)
+	fmt.Println("len(client):", len(verificationCode))
+	fmt.Println("len(db):    ", len(user.VerificationCode))
+
 	if user.VerificationCode != verificationCode {
 		return errors.New("invalid verification code")
 	}
@@ -265,7 +296,7 @@ func generateRandomToken(length int) (string, error) {
 }
 
 // GetUserByID - получает пользователя по ID
-func (s *authServiceImpl) GetUserByID(userID uint) (*domain.User, error) {
+func (s *authServiceImpl) GetUserByID(userID uuid.UUID) (*domain.User, error) {
 	user, err := s.userRepo.FindByID(userID)
 	if err != nil {
 		return nil, err
@@ -277,6 +308,11 @@ func (s *authServiceImpl) GetUserByID(userID uint) (*domain.User, error) {
 }
 
 // Logout - выход из профиля, удаляет refresh-токен
-func (s *authServiceImpl) Logout(userID uint) error {
+func (s *authServiceImpl) Logout(userID uuid.UUID) error {
 	return s.userRepo.DeleteRefreshToken(userID)
+}
+
+// DeleteAccount - удаление аккаунта
+func (s *authServiceImpl) DeleteAccount(userID uuid.UUID) error {
+	return s.userRepo.DeleteUser(userID)
 }

@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 // Handler хранит ссылку на сервис аутентификации
@@ -97,7 +98,7 @@ func (h *Handler) Me(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in context"})
 		return
 	}
-	userID, ok := userIDVal.(uint)
+	userID, ok := userIDVal.(uuid.UUID)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user ID type"})
 		return
@@ -116,7 +117,7 @@ func (h *Handler) Me(c *gin.Context) {
 	})
 }
 
-// [Новый метод] ForgotPassword — POST /auth/forgot_password
+// ForgotPassword — POST /auth/forgot_password
 func (h *Handler) ForgotPassword(c *gin.Context) {
 	var req struct {
 		Email string `json:"email"`
@@ -140,7 +141,7 @@ func (h *Handler) ForgotPassword(c *gin.Context) {
 	})
 }
 
-// [Новый метод] ResetPassword — POST /auth/reset_password
+// ResetPassword — POST /auth/reset_password
 func (h *Handler) ResetPassword(c *gin.Context) {
 	var req struct {
 		ResetToken  string `json:"reset_token"`
@@ -162,7 +163,7 @@ func (h *Handler) ResetPassword(c *gin.Context) {
 	})
 }
 
-// [Новый метод] VerifyEmail — POST /auth/verify_email
+// VerifyEmail — POST /auth/verify_email
 func (h *Handler) VerifyEmail(c *gin.Context) {
 	var req struct {
 		Email            string `json:"email"`
@@ -194,20 +195,44 @@ func (h *Handler) VerifyEmail(c *gin.Context) {
 
 // Logout обрабатывает POST /auth/logout
 // Удаляет refresh_token и завершает сессию пользователя
+// Logout — POST /auth/logout
 func (h *Handler) Logout(c *gin.Context) {
-	var req struct {
-		UserID uint `json:"user_id"`
+	userIDVal, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not authorized"})
+		return
 	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+	userID, ok := userIDVal.(uuid.UUID)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user ID"})
 		return
 	}
 
-	err := h.authService.Logout(req.UserID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not log out user"})
+	if err := h.authService.Logout(userID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Logout failed"})
 		return
 	}
 
-	c.JSON(http.StatusNoContent, nil) // 204 - успешный выход, без тела ответа
+	c.JSON(http.StatusNoContent, nil)
+}
+
+// DeleteAccount — удаление аккаунта (DELETE /auth/delete)
+func (h *Handler) DeleteAccount(c *gin.Context) {
+	userIDVal, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not authorized"})
+		return
+	}
+	userID, ok := userIDVal.(uuid.UUID)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user ID"})
+		return
+	}
+
+	if err := h.authService.DeleteAccount(userID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete user"})
+		return
+	}
+
+	c.JSON(http.StatusNoContent, nil)
 }

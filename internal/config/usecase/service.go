@@ -4,8 +4,10 @@ import (
 	"StartupPCConfigurator/internal/config/repository"
 	"StartupPCConfigurator/internal/domain"
 	"errors"
-	_ "fmt"
-	_ "time"
+	"fmt"
+	"strings"
+
+	"github.com/google/uuid"
 )
 
 var (
@@ -13,28 +15,17 @@ var (
 	ErrForbidden      = errors.New("not owner of configuration")
 )
 
-// Интерфейс, который будет использовать хендлер
 type ConfigService interface {
 	FetchComponents(category, search string) ([]domain.Component, error)
-	FetchCompatibleComponents(category, cpuSocket, memoryType string) ([]domain.Component, error)
-	CreateConfiguration(userId, name string, comps []domain.ComponentRef) (domain.Configuration, error)
-	FetchUserConfigurations(userId string) ([]domain.Configuration, error)
-	UpdateConfiguration(userId, configId string, name string, comps []domain.ComponentRef) (domain.Configuration, error)
-	DeleteConfiguration(userId, configId string) error
+	FetchCompatibleComponents(filter domain.CompatibilityFilter) ([]domain.Component, error)
+	CreateConfiguration(userId uuid.UUID, name string, comps []domain.ComponentRef) (domain.Configuration, error)
+	FetchUserConfigurations(userId uuid.UUID) ([]domain.Configuration, error)
+	UpdateConfiguration(userId uuid.UUID, configId string, name string, comps []domain.ComponentRef) (domain.Configuration, error)
+	DeleteConfiguration(userId uuid.UUID, configId string) error
 }
 
-// Реализация
 type configService struct {
 	repo repository.ConfigRepository
-}
-
-func (s *configService) FetchCompatibleComponents(category, cpuSocket, memoryType string) ([]domain.Component, error) {
-	// Можно реализовать логику совместимости на уровне бизнес-логики.
-	// Например: если запрошена категория "motherboard" и указан cpuSocket,
-	// фильтровать материнские платы по указанному сокету.
-	// В качестве упрощённого варианта сразу перенаправим запрос в репозиторий.
-
-	return s.repo.GetCompatibleComponents(category, cpuSocket, memoryType)
 }
 
 func NewConfigService(r repository.ConfigRepository) ConfigService {
@@ -45,31 +36,51 @@ func (s *configService) FetchComponents(category, search string) ([]domain.Compo
 	return s.repo.GetComponents(category, search)
 }
 
-func (s *configService) CreateConfiguration(userId, name string, comps []domain.ComponentRef) (domain.Configuration, error) {
-	// тут можно проверить бизнес-логику (пустое имя? нет компонентов?)
+func (s *configService) FetchCompatibleComponents(filter domain.CompatibilityFilter) ([]domain.Component, error) {
+	return s.repo.GetCompatibleComponents(filter)
+}
+
+func (s *configService) CreateConfiguration(userId uuid.UUID, name string, refs []domain.ComponentRef) (domain.Configuration, error) {
 	if name == "" {
 		return domain.Configuration{}, errors.New("name is required")
 	}
-	if len(comps) == 0 {
+	if len(refs) == 0 {
 		return domain.Configuration{}, errors.New("at least one component required")
 	}
 
-	// Можно проверить совместимость, если у нас есть правила:
-	// isCompatible := checkCompatibility(comps)
-	// if !isCompatible { return ..., ... }
+	var fullComps []domain.Component
+	for _, ref := range refs {
+		comp, err := s.repo.GetComponentByName(ref.Category, ref.Name)
+		if err != nil {
+			return domain.Configuration{}, fmt.Errorf("component not found: %s / %s", ref.Category, ref.Name)
+		}
+		fullComps = append(fullComps, comp)
+	}
 
-	config, err := s.repo.CreateConfiguration(userId, name, comps)
-	return config, err
+	errs := CheckCompatibility(fullComps)
+	if len(errs) > 0 {
+		return domain.Configuration{}, fmt.Errorf("сборка несовместима: %s", strings.Join(errs, "; "))
+	}
+
+	return s.repo.CreateConfiguration(userId, name, fullComps)
 }
 
-func (s *configService) FetchUserConfigurations(userId string) ([]domain.Configuration, error) {
-	return s.repo.GetUserConfigurations(userId)
-}
+func (s *configService) UpdateConfiguration(userId uuid.UUID, configId string, name string, refs []domain.ComponentRef) (domain.Configuration, error) {
+	var fullComps []domain.Component
+	for _, ref := range refs {
+		comp, err := s.repo.GetComponentByName(ref.Category, ref.Name)
+		if err != nil {
+			return domain.Configuration{}, fmt.Errorf("component not found: %s / %s", ref.Category, ref.Name)
+		}
+		fullComps = append(fullComps, comp)
+	}
 
-func (s *configService) UpdateConfiguration(userId, configId string, name string, comps []domain.ComponentRef) (domain.Configuration, error) {
-	// Проверить, что конфигурация принадлежит userId, что она существует
-	// Проверить логику
-	updated, err := s.repo.UpdateConfiguration(userId, configId, name, comps)
+	errs := CheckCompatibility(fullComps)
+	if len(errs) > 0 {
+		return domain.Configuration{}, fmt.Errorf("сборка несовместима: %s", strings.Join(errs, "; "))
+	}
+
+	updated, err := s.repo.UpdateConfiguration(userId, configId, name, fullComps)
 	if err != nil {
 		if errors.Is(err, domain.ErrConfigNotFound) {
 			return domain.Configuration{}, domain.ErrConfigNotFound
@@ -81,7 +92,11 @@ func (s *configService) UpdateConfiguration(userId, configId string, name string
 	return updated, nil
 }
 
-func (s *configService) DeleteConfiguration(userId, configId string) error {
+func (s *configService) FetchUserConfigurations(userId uuid.UUID) ([]domain.Configuration, error) {
+	return s.repo.GetUserConfigurations(userId)
+}
+
+func (s *configService) DeleteConfiguration(userId uuid.UUID, configId string) error {
 	err := s.repo.DeleteConfiguration(userId, configId)
 	if err != nil {
 		if errors.Is(err, domain.ErrConfigNotFound) {
