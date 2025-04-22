@@ -13,46 +13,65 @@ import (
 )
 
 func main() {
-	// Считываем JWT секрет из переменной окружения или хардкодим
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
 		jwtSecret = "secret_key"
 	}
 
 	router := gin.Default()
-
-	// CORS (по необходимости можно расширить)
 	router.Use(cors.Default())
 
-	// Публичный /auth/** — без авторизации
+	// 🔓 Публичный /auth/*
 	router.Any("/auth/*proxyPath", reverseProxy("http://localhost:8001"))
 
-	// Группа с авторизацией
-	authGroup := router.Group("/")
-	authGroup.Use(middleware.AuthMiddleware(jwtSecret))
+	// 🔓 Публичные ручки config-сервиса
+	router.GET("/config/components", reverseProxyPath("http://localhost:8002", "/components"))
+	router.GET("/config/compatible", reverseProxyPath("http://localhost:8002", "/compatible"))
+
+	// 🔐 Защищённые ручки config-сервиса через /config-secure/*
+	configProtected := router.Group("/config-secure")
+	configProtected.Use(middleware.AuthMiddleware(jwtSecret))
 	{
-		authGroup.Any("/config/*proxyPath", reverseProxy("http://localhost:8002"))
-		authGroup.Any("/offers/*proxyPath", reverseProxy("http://localhost:8003"))
+		configProtected.Any("/*proxyPath", reverseProxy("http://localhost:8002"))
 	}
 
-	// Запуск
-	log.Println("Gateway запущен на :8080")
+	// 🔐 Защищённые ручки aggregator-сервиса через /offers/*
+	offersGroup := router.Group("/offers")
+	offersGroup.Use(middleware.AuthMiddleware(jwtSecret))
+	{
+		offersGroup.Any("/*proxyPath", reverseProxy("http://localhost:8003"))
+	}
+
+	log.Println("🚀 Gateway запущен на :8080")
 	if err := router.Run(":8080"); err != nil {
-		log.Fatalf("Не удалось запустить gateway: %v", err)
+		log.Fatalf("❌ Не удалось запустить gateway: %v", err)
 	}
 }
 
-// reverseProxy возвращает gin.HandlerFunc, которая проксирует запрос
+// reverseProxy — для маршрутов с *proxyPath
 func reverseProxy(target string) gin.HandlerFunc {
 	remote, err := url.Parse(target)
 	if err != nil {
 		log.Fatalf("Невалидный адрес сервиса: %v", err)
 	}
-
 	proxy := httputil.NewSingleHostReverseProxy(remote)
 
 	return func(c *gin.Context) {
 		c.Request.URL.Path = c.Param("proxyPath")
+		proxy.ServeHTTP(c.Writer, c.Request)
+	}
+}
+
+// reverseProxyPath — для фиксированных путей без wildcard
+func reverseProxyPath(target, path string) gin.HandlerFunc {
+	remote, err := url.Parse(target)
+	if err != nil {
+		log.Fatalf("Невалидный адрес сервиса: %v", err)
+	}
+	proxy := httputil.NewSingleHostReverseProxy(remote)
+
+	return func(c *gin.Context) {
+		c.Request.URL.Path = path
 		proxy.ServeHTTP(c.Writer, c.Request)
 	}
 }

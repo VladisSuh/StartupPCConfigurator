@@ -32,8 +32,7 @@ Content-Type: application/json
 #       "expires_at":   "..."
 #   }
 ################################################################################
-@access_token  = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImtyYXNpbmFfMjAwM0BtYWlsLnJ1IiwiZXhwIjoxNzQ1MjY5MDIzLCJ1c2VyX2lkIjoiZjVhM2EyODQtYzZiMS00NWFkLWIyZjUtYTQ4MDRkNzRlYTFmIn0.SZIa5msMKheiJx_6EcIQmXy8YwulxlH75uP2YGCJm-k
-
+@access_token  = 
 @refresh_token = SGppWH0uFI3Iz5Y6Hpk3HgTQs4stSF7aR0cd32XK_LulHcJ1OE8Z9Lf_Enm-bBBFy3qR_k-4ePUUZb_JCaWCKQ==
 
 ################################################################################

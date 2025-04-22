@@ -53,7 +53,7 @@ func main() {
 	// 7. Запуск сервера на порте (например, 8081)
 	port := os.Getenv("CONFIG_SERVICE_PORT")
 	if port == "" {
-		port = "8081"
+		port = "8002"
 	}
 	r.Run(":" + port)
 }
