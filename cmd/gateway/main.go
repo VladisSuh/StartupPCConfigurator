@@ -18,28 +18,32 @@ func main() {
 		jwtSecret = "secret_key"
 	}
 
+	authURL := os.Getenv("AUTH_SERVICE_URL")
+	configURL := os.Getenv("CONFIG_SERVICE_URL")
+	agrURL := os.Getenv("AGGREGATOR_SERVICE_URL")
+
 	router := gin.Default()
 	router.Use(cors.Default())
 
 	// 🔓 Публичный /auth/*
-	router.Any("/auth/*proxyPath", reverseProxy("http://localhost:8001"))
+	router.Any("/auth/*proxyPath", reverseProxy(authURL))
 
 	// 🔓 Публичные ручки config-сервиса
-	router.GET("/config/components", reverseProxyPath("http://localhost:8002", "/components"))
-	router.GET("/config/compatible", reverseProxyPath("http://localhost:8002", "/compatible"))
+	router.GET("/config/components", reverseProxyPath(configURL, "/components"))
+	router.GET("/config/compatible", reverseProxyPath(configURL, "/compatible"))
 
 	// 🔐 Защищённые ручки config-сервиса через /config-secure/*
 	configProtected := router.Group("/config-secure")
 	configProtected.Use(middleware.AuthMiddleware(jwtSecret))
 	{
-		configProtected.Any("/*proxyPath", reverseProxy("http://localhost:8002"))
+		configProtected.Any("/*proxyPath", reverseProxy("configURL"))
 	}
 
 	// 🔐 Защищённые ручки aggregator-сервиса через /offers/*
 	offersGroup := router.Group("/offers")
 	offersGroup.Use(middleware.AuthMiddleware(jwtSecret))
 	{
-		offersGroup.Any("/*proxyPath", reverseProxy("http://localhost:8003"))
+		offersGroup.Any("/*proxyPath", reverseProxy(agrURL))
 	}
 
 	log.Println("🚀 Gateway запущен на :8080")

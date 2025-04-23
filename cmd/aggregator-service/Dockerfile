@@ -12,5 +12,5 @@ WORKDIR /app
 
 COPY --from=builder /app/aggregator /app/aggregator
 
-EXPOSE 8082
+EXPOSE 8003
 CMD ["/app/aggregator"]

@@ -8,12 +8,13 @@ services:
       dockerfile: ./cmd/auth-service/Dockerfile
     container_name: auth_service
     # Пробрасываем порт 8080 наружу
-    ports:
-      - "8080:8080"
     environment:
       - DB_CONN_STR=postgres://postgres:postgres@postgres:5432/postgres_db?sslmode=disable
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
       - REDIS_URL=redis:6379
+      - AUTH_SERVICE_PORT=8001
+    ports:
+      - "8001:8001"
     depends_on:
       - postgres
       - rabbitmq
@@ -25,12 +26,13 @@ services:
       context: .
       dockerfile: ./cmd/config-service/Dockerfile
     container_name: config_service
-    ports:
-      - "8081:8081"
     environment:
       - DB_CONN_STR=postgres://postgres:postgres@postgres:5432/postgres_db?sslmode=disable
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
       - REDIS_URL=redis:6379
+      - CONFIG_SERVICE_PORT=8002
+    ports:
+      - "8002:8002"
     depends_on:
       - postgres
       - rabbitmq
@@ -42,34 +44,35 @@ services:
       context: .
       dockerfile: ./cmd/aggregator-service/Dockerfile
     container_name: aggregator_service
-    ports:
-      - "8082:8082"
     environment:
       - DB_CONN_STR=postgres://postgres:postgres@postgres:5432/postgres_db?sslmode=disable
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
       - REDIS_URL=redis:6379
+      - AGG_SERVICE_PORT=8003
+    ports:
+      - "8003:8003"
     depends_on:
       - postgres
       - rabbitmq
       - redis
 
   # ---------- Gateway (API Gateway) ----------
-#  gateway:
-#    build:
-#      context: .
-#      dockerfile: ./cmd/gateway/Dockerfile
-#    container_name: gateway_service
-#    ports:
-#      - "8088:8080"
-#    environment:
-#      - AUTH_SERVICE_URL=http://auth:8080
-#      - CONFIG_SERVICE_URL=http://config:8081
-#      - AGGREGATOR_SERVICE_URL=http://aggregator:8082
-#      # ... возможно, здесь же RABBITMQ_URL, REDIS_URL, etc
-#    depends_on:
-#      - auth
-#      - config
-#      - aggregator
+  gateway:
+    build:
+      context: .
+      dockerfile: ./cmd/gateway/Dockerfile
+    container_name: gateway_service
+    environment:
+      - AUTH_SERVICE_URL=http://auth:8001
+      - CONFIG_SERVICE_URL=http://config:8002
+      - AGGREGATOR_SERVICE_URL=http://aggregator:8003
+      # ... возможно, здесь же RABBITMQ_URL, REDIS_URL, etc
+    ports:
+      - "8080:8080"
+    depends_on:
+      - auth
+      - config
+      - aggregator
 
   # ---------- RabbitMQ ----------
   rabbitmq:

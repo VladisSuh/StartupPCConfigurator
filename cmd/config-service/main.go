@@ -17,13 +17,15 @@ import (
 
 func main() {
 	// 1. Инициализируем соединение с БД
-	dbURL := "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable"
-	db, err := sql.Open("postgres", dbURL)
+	dsn := os.Getenv("DB_CONN_STR")
+	if dsn == "" {
+		log.Fatal("DB_CONN_STR не задан")
+	}
+	db, err := sql.Open("postgres", dsn)
 	if err != nil {
 		log.Fatalf("Failed to init DB: %v", err)
 	}
 	defer db.Close()
-
 	// 2. Создаём репозиторий
 	repo := repository.NewConfigRepository(db)
 
