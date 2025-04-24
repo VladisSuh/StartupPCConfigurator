@@ -26,6 +26,7 @@ func main() {
 		log.Fatalf("Failed to init DB: %v", err)
 	}
 	defer db.Close()
+
 	// 2. Создаём репозиторий
 	repo := repository.NewConfigRepository(db)
 
@@ -36,12 +37,21 @@ func main() {
 	r := gin.Default()
 
 	// 5. Подключаем middleware
-	auth := middleware.AuthMiddleware("secret_key")
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		log.Fatal("JWT_SECRET не задан")
+	}
+
+	auth := middleware.AuthMiddleware(jwtSecret)
 	h := handlers.NewConfigHandler(service)
 
 	// 6. Публичные ручки
 	r.GET("/components", h.GetComponents)
 	r.GET("/compatible", h.GetCompatibleComponents)
+	r.GET("/usecases", h.ListUseCases)
+	r.GET("/usecase/:name", h.GetUseCaseBuild)
+	r.POST("/generate", h.GenerateConfigs)
+	r.POST("/usecase/:name/generate", h.GenerateUseCaseConfigs)
 
 	// 7. Защищённые ручки
 	api := r.Group("/", auth)

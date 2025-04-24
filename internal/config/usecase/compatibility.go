@@ -3,6 +3,7 @@ package usecase
 import (
 	"StartupPCConfigurator/internal/domain"
 	"encoding/json"
+	"strings"
 )
 
 func CheckCompatibility(components []domain.Component) []string {
@@ -83,4 +84,46 @@ func CheckCompatibility(components []domain.Component) []string {
 	}
 
 	return errors
+}
+
+// GenerateConfigurations перебирает все доступные компоненты и возвращает
+// только те сборки, где CheckCompatibility не находит несовместимостей.
+func GenerateConfigurations(allComponents []domain.Component) [][]domain.Component {
+	// 1) Группируем все по нормализованным категориям
+	categories := map[string][]domain.Component{
+		"cpu":         {},
+		"motherboard": {},
+		"ram":         {},
+		"gpu":         {},
+		"psu":         {},
+		"case":        {},
+	}
+	for _, c := range allComponents {
+		cat := strings.ToLower(c.Category)
+		if _, ok := categories[cat]; ok {
+			categories[cat] = append(categories[cat], c)
+		}
+	}
+
+	configs := make([][]domain.Component, 0)
+
+	// 2) Перебираем все возможные комбинации
+	for _, cpu := range categories["cpu"] {
+		for _, mb := range categories["motherboard"] {
+			for _, ram := range categories["ram"] {
+				for _, gpu := range categories["gpu"] {
+					for _, psu := range categories["psu"] {
+						for _, caseComp := range categories["case"] {
+							combo := []domain.Component{cpu, mb, ram, gpu, psu, caseComp}
+							if len(CheckCompatibility(combo)) == 0 {
+								configs = append(configs, combo)
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return configs
 }

@@ -31,12 +31,27 @@ func main() {
 	// 🔓 Публичные ручки config-сервиса
 	router.GET("/config/components", reverseProxyPath(configURL, "/components"))
 	router.GET("/config/compatible", reverseProxyPath(configURL, "/compatible"))
+	router.GET("/config/usecases", reverseProxyPath(configURL, "/usecases"))
+	router.POST("/config/generate", reverseProxyPath(configURL, "/generate"))
+	// GET /config/usecase/:name → проксируем к /usecase/{name}
+	router.GET("/config/usecase/:name", func(c *gin.Context) {
+		name := c.Param("name")
+		c.Request.URL.Path = "/usecase/" + name
+		reverseProxy(configURL)(c)
+	})
+
+	// POST /config/usecase/:name/generate → проксируем к /usecase/{name}/generate
+	router.POST("/config/usecase/:name/generate", func(c *gin.Context) {
+		name := c.Param("name")
+		c.Request.URL.Path = "/usecase/" + name + "/generate"
+		reverseProxy(configURL)(c)
+	})
 
 	// 🔐 Защищённые ручки config-сервиса через /config-secure/*
 	configProtected := router.Group("/config-secure")
 	configProtected.Use(middleware.AuthMiddleware(jwtSecret))
 	{
-		configProtected.Any("/*proxyPath", reverseProxy("configURL"))
+		configProtected.Any("/*proxyPath", reverseProxy(configURL))
 	}
 
 	// 🔐 Защищённые ручки aggregator-сервиса через /offers/*
@@ -46,9 +61,9 @@ func main() {
 		offersGroup.Any("/*proxyPath", reverseProxy(agrURL))
 	}
 
-	log.Println("🚀 Gateway запущен на :8080")
+	log.Println("Gateway запущен на :8080")
 	if err := router.Run(":8080"); err != nil {
-		log.Fatalf("❌ Не удалось запустить gateway: %v", err)
+		log.Fatalf("Не удалось запустить gateway: %v", err)
 	}
 }
 

@@ -22,6 +22,7 @@ type ConfigRepository interface {
 	DeleteConfiguration(userId uuid.UUID, configId string) error
 	GetComponentByID(category, id string) (domain.Component, error)
 	GetComponentByName(category, name string) (domain.Component, error)
+	GetUseCases() ([]domain.UseCase, error)
 }
 
 // Реализация
@@ -460,4 +461,23 @@ func (r *configRepository) GetComponentByName(category, name string) (domain.Com
 	}
 
 	return c, nil
+}
+
+// Реализуем GetUseCases
+func (r *configRepository) GetUseCases() ([]domain.UseCase, error) {
+	rows, err := r.db.Query(`SELECT id, name, description FROM usecases`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []domain.UseCase
+	for rows.Next() {
+		var uc domain.UseCase
+		if err := rows.Scan(&uc.ID, &uc.Name, &uc.Description); err != nil {
+			return nil, err
+		}
+		out = append(out, uc)
+	}
+	return out, nil
 }

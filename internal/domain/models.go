@@ -97,3 +97,10 @@ type CompatibilityFilter struct {
 	CoolerHeightMM float64 // например 160.0
 	PowerRequired  float64 // для GPU (в ваттах)
 }
+
+// UseCase — описание сценария сборки
+type UseCase struct {
+	ID          int    `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}

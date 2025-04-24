@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"StartupPCConfigurator/internal/config/usecase"
 
@@ -54,19 +55,6 @@ func (h *ConfigHandler) CreateConfig(c *gin.Context) {
 
 	// Успешный ответ: 201 + JSON с созданной конфигурацией
 	c.JSON(http.StatusCreated, config)
-}
-
-// Вспомогательная функция, если в вашем сервисе ожидаются []repository.ComponentRef
-// а здесь у вас локальные типы. Можно конвертировать.
-func toDomainRefs(input []ComponentRef) []domain.ComponentRef {
-	var result []domain.ComponentRef
-	for _, c := range input {
-		result = append(result, domain.ComponentRef{
-			Category: c.Category,
-			Name:     c.Name,
-		})
-	}
-	return result
 }
 
 // Создаём для PUT-запроса /config/newconfig/:configId
@@ -205,4 +193,84 @@ func (h *ConfigHandler) DeleteConfig(c *gin.Context) {
 	}
 
 	c.Status(http.StatusNoContent) // 204
+}
+
+// ListUseCases обрабатывает GET /config/usecases
+func (h *ConfigHandler) ListUseCases(c *gin.Context) {
+	usecases, err := h.service.ListUseCases()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, usecases)
+}
+
+// GetUseCaseBuild обрабатывает GET /config/usecase/:name
+func (h *ConfigHandler) GetUseCaseBuild(c *gin.Context) {
+	name := c.Param("name")
+	build, err := h.service.GetUseCaseBuild(name)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"components": build})
+}
+
+// GenerateUseCaseConfigsRequest — тело POST /config/usecase/:name/generate
+type GenerateUseCaseConfigsRequest struct {
+	Components []ComponentRef `json:"components"`
+}
+
+// GenerateUseCaseConfigs обрабатывает POST /config/usecase/:name/generate
+func (h *ConfigHandler) GenerateUseCaseConfigs(c *gin.Context) {
+	name := c.Param("name")
+
+	var req GenerateUseCaseConfigsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+
+	configs, err := h.service.GenerateUseCaseConfigs(name, toDomainRefs(req.Components))
+	if err != nil {
+		// различаем неизвестный сценарий и прочие ошибки
+		if strings.HasPrefix(err.Error(), "unknown use case") {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		}
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"configs": configs})
+}
+
+// вспомогательная конвертация, как и для Create/Update
+func toDomainRefs(input []ComponentRef) []domain.ComponentRef {
+	var result []domain.ComponentRef
+	for _, c := range input {
+		result = append(result, domain.ComponentRef{
+			Category: c.Category,
+			Name:     c.Name,
+		})
+	}
+	return result
+}
+
+// POST /config/generate
+func (h *ConfigHandler) GenerateConfigs(c *gin.Context) {
+	var req struct {
+		Components []domain.ComponentRef `json:"components"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	configs, err := h.service.GenerateConfigurations(req.Components)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"configs": configs})
 }

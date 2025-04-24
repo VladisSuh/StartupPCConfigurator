@@ -26,6 +26,11 @@ CREATE TABLE IF NOT EXISTS components (
 CREATE INDEX IF NOT EXISTS idx_components_category
     ON components (category);
 
+
+CREATE INDEX IF NOT EXISTS idx_components_specs 
+    ON components USING GIN (specs);
+
+
 -- (Опционально) Индекс для поиска по имени/бренду:
 CREATE INDEX IF NOT EXISTS idx_components_name_brand
     ON components (name, brand);
@@ -118,7 +123,7 @@ CREATE TABLE IF NOT EXISTS update_jobs (
     finished_at  TIMESTAMP,
     message      TEXT
     );
-
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 ALTER TABLE users DROP COLUMN id;
 
 ALTER TABLE users
@@ -218,3 +223,195 @@ INSERT INTO components (name, category, brand, specs, created_at, updated_at) VA
 -- Доп. совместимый блок питания
 INSERT INTO components (name, category, brand, specs, created_at, updated_at) VALUES
     ('be quiet! Pure Power 12 M 850W', 'psu', 'be quiet!', '{"power": 850}', NOW(), NOW());
+
+
+
+-- 1) Сверхдлинная видеокарта для проверки ограничения корпуса
+INSERT INTO components (name, category, brand, specs, created_at, updated_at)
+VALUES
+  ('Test GPU XXL', 'gpu', 'TestBrand',
+   '{"length_mm":400,"power_draw":300}', NOW(), NOW());
+
+-- 2) CPU с очень высоким кулером (для проверки ограничения высоты)
+INSERT INTO components (name, category, brand, specs, created_at, updated_at)
+VALUES
+  ('Test CPU TallCooler', 'cpu', 'TestBrand',
+   '{"socket":"AM4","tdp":95,"cooler_height":200}', NOW(), NOW());
+
+-- 3) Мини-корпус форм-фактора Mini-ITX с очень жёсткими габаритами
+INSERT INTO components (name, category, brand, specs, created_at, updated_at)
+VALUES
+  ('Mini-ITX TinyCase', 'case', 'TestBrand',
+   '{"form_factor_support":"Mini-ITX","gpu_max_length":170,"cooler_max_height":120}', NOW(), NOW());
+
+-- 4) Маломощный блок питания (для проверки на слабую PSU)
+INSERT INTO components (name, category, brand, specs, created_at, updated_at)
+VALUES
+  ('Test PSU 300W', 'psu', 'TestBrand',
+   '{"power":300}', NOW(), NOW());
+
+-- 5) RAM с другим типом (DDR3) для проверки несовместимости
+INSERT INTO components (name, category, brand, specs, created_at, updated_at)
+VALUES
+  ('Test RAM DDR3 8GB', 'ram', 'TestBrand',
+   '{"ram_type":"DDR3","frequency":1600,"capacity":8}', NOW(), NOW());
+
+-- 6) Материнка под Mini-ITX, но без нужного слота под сверхвысокий кулер
+INSERT INTO components (name, category, brand, specs, created_at, updated_at)
+VALUES
+  ('Test MB Mini-ITX', 'motherboard', 'TestBrand',
+   '{"socket":"AM4","ram_type":"DDR4","form_factor":"Mini-ITX"}', NOW(), NOW());
+
+
+
+-- CPU
+UPDATE components
+SET specs = specs || '{"cooler_height":158}'
+WHERE name = 'AMD Ryzen 5 5600X';
+
+UPDATE components
+SET specs = specs || '{"cooler_height":145}'
+WHERE name = 'Intel Core i5-12400';
+
+UPDATE components
+SET specs = specs || '{"cooler_height":160}'
+WHERE name = 'AMD Ryzen 7 7700X';  -- для AM5-модели
+
+-- RAM
+UPDATE components
+SET specs = specs || '{"ram_type":"DDR4"}'
+WHERE name = 'Corsair Vengeance LPX 16GB DDR4-3200';
+
+UPDATE components
+SET specs = specs || '{"ram_type":"DDR4"}'
+WHERE name = 'Kingston Fury 32GB DDR4-3600';
+
+UPDATE components
+SET specs = specs || '{"ram_type":"DDR5"}'
+WHERE name = 'G.Skill Trident Z5 RGB 32GB DDR5-6000';
+
+-- GPU
+UPDATE components
+SET specs = specs || '{"length_mm":242,"power_draw":170}'
+WHERE name = 'NVIDIA GeForce RTX 3060';
+
+UPDATE components
+SET specs = specs || '{"length_mm":267,"power_draw":230}'
+WHERE name = 'AMD Radeon RX 6700 XT';
+
+-- PSU
+UPDATE components
+SET specs = specs || '{"power":650}'
+WHERE name = 'Seasonic Focus GX-650';
+
+UPDATE components
+SET specs = specs || '{"power":750}'
+WHERE name = 'Corsair RM750';
+
+UPDATE components
+SET specs = specs || '{"power":850}'
+WHERE name = 'be quiet! Pure Power 12 M 850W';
+
+-- Case
+UPDATE components
+SET specs = specs || '{"gpu_max_length":325,"cooler_max_height":165}'
+WHERE name = 'NZXT H510';
+
+UPDATE components
+SET specs = specs || '{"gpu_max_length":170,"cooler_max_height":120}'
+WHERE name = 'Mini-ITX TinyCase';  -- если тестовый корпус добавлен
+
+
+INSERT INTO components (name, category, brand, specs, created_at, updated_at)
+VALUES
+  ('NZXT H510', 'case', 'NZXT',
+   '{"gpu_max_length":325,"cooler_max_height":165}', NOW(), NOW()),
+  ('Mini-ITX TinyCase', 'case', 'TestBrand',
+   '{"gpu_max_length":170,"cooler_max_height":120}', NOW(), NOW());
+
+
+
+
+-- Таблица сценариев использования (Use Cases)
+CREATE TABLE IF NOT EXISTS usecases (
+    id          SERIAL PRIMARY KEY,
+    name        VARCHAR(100) UNIQUE NOT NULL,  -- например: office, gaming, designer и т.д.
+    description TEXT                               -- краткое описание сценария
+);
+
+INSERT INTO usecases (name, description) VALUES
+  ('office',   'Офисный ПК для документов и почты'),
+  ('htpc',     'Домашний медиаплеер в мини-корпусе'),
+  ('gaming',   'Игровой ПК среднего–высокого уровня'),
+  ('streamer', 'Станция для стриминга и игр'),
+  ('design',   'Графический дизайн и фото-обработка'),
+  ('video',    'Видеомонтаж и рендеринг'),
+  ('cad',      '3D-моделирование и CAD'),
+  ('dev',      'ПК для разработки и виртуализации'),
+  ('enthusiast','High-End система с разгоном и RGB'),
+  ('nas',      'Домашний сервер / NAS');
+
+
+-- 1. Новые CPU
+INSERT INTO components (name, category, brand, specs, created_at, updated_at) VALUES
+  ('Intel Core i9-12900K',   'cpu', 'Intel', '{"socket":"LGA1700","tdp":125,"cooler_height":165}', NOW(), NOW()),
+  ('Intel Core i7-12700K',   'cpu', 'Intel', '{"socket":"LGA1700","tdp":125,"cooler_height":160}', NOW(), NOW()),
+  ('AMD Ryzen 9 7950X',      'cpu', 'AMD',   '{"socket":"AM5","tdp":170,"cooler_height":165}', NOW(), NOW()),
+  ('AMD Ryzen 5 7600',       'cpu', 'AMD',   '{"socket":"AM5","tdp":65,"cooler_height":158}', NOW(), NOW()),
+  ('Intel Core i3-12100',    'cpu', 'Intel', '{"socket":"LGA1700","tdp":60,"cooler_height":140}', NOW(), NOW()),
+  ('AMD Athlon 3000G',       'cpu', 'AMD',   '{"socket":"AM4","tdp":35,"cooler_height":120}', NOW(), NOW());
+
+-- 2. Новые материнские платы
+INSERT INTO components (name, category, brand, specs, created_at, updated_at) VALUES
+  ('Asus ROG Strix Z690-A',   'motherboard', 'ASUS',     '{"socket":"LGA1700","ram_type":"DDR5","form_factor":"ATX"}', NOW(), NOW()),
+  ('Gigabyte X670 Aorus Elite','motherboard','Gigabyte', '{"socket":"AM5","ram_type":"DDR5","form_factor":"ATX"}', NOW(), NOW()),
+  ('MSI MAG B650M Mortar',    'motherboard', 'MSI',      '{"socket":"AM5","ram_type":"DDR5","form_factor":"mATX"}', NOW(), NOW()),
+  ('Gigabyte B660M DS3H',     'motherboard', 'Gigabyte', '{"socket":"LGA1700","ram_type":"DDR4","form_factor":"mATX"}', NOW(), NOW()),
+  ('NZXT N7 B550',            'motherboard', 'NZXT',     '{"socket":"AM4","ram_type":"DDR4","form_factor":"ATX"}', NOW(), NOW()),
+  ('Asus ROG Strix B660-I',   'motherboard', 'ASUS',     '{"socket":"LGA1700","ram_type":"DDR5","form_factor":"Mini-ITX"}', NOW(), NOW());
+
+-- 3. Новые модули RAM
+INSERT INTO components (name, category, brand, specs, created_at, updated_at) VALUES
+  ('Corsair Dominator Platinum 32GB DDR5-5600', 'ram','Corsair','{"ram_type":"DDR5","frequency":5600,"capacity":32}', NOW(), NOW()),
+  ('G.Skill Ripjaws S5 16GB DDR5-5200',         'ram','G.Skill','{"ram_type":"DDR5","frequency":5200,"capacity":16}', NOW(), NOW()),
+  ('Crucial Ballistix 32GB DDR4-3600',          'ram','Crucial','{"ram_type":"DDR4","frequency":3600,"capacity":32}', NOW(), NOW()),
+  ('Kingston HyperX Fury 16GB DDR4-2666',       'ram','Kingston','{"ram_type":"DDR4","frequency":2666,"capacity":16}', NOW(), NOW()),
+  ('Patriot Viper Steel 8GB DDR4-3200',         'ram','Patriot','{"ram_type":"DDR4","frequency":3200,"capacity":8}', NOW(), NOW()),
+  ('Corsair Vengeance LPX 8GB DDR4-2400',       'ram','Corsair','{"ram_type":"DDR4","frequency":2400,"capacity":8}', NOW(), NOW());
+
+-- 4. Новые видеокарты
+INSERT INTO components (name, category, brand, specs, created_at, updated_at) VALUES
+  ('NVIDIA GeForce RTX 3080',  'gpu','NVIDIA','{"length_mm":285,"power_draw":320}', NOW(), NOW()),
+  ('NVIDIA GeForce RTX 4090',  'gpu','NVIDIA','{"length_mm":304,"power_draw":450}', NOW(), NOW()),
+  ('AMD Radeon RX 7900 XT',    'gpu','AMD',   '{"length_mm":267,"power_draw":300}', NOW(), NOW()),
+  ('NVIDIA Quadro P2200',      'gpu','NVIDIA','{"length_mm":172,"power_draw":75}', NOW(), NOW()),
+  ('AMD Radeon Pro W5500',     'gpu','AMD',   '{"length_mm":182,"power_draw":50}', NOW(), NOW()),
+  ('NVIDIA GeForce GTX 1650',  'gpu','NVIDIA','{"length_mm":175,"power_draw":75}', NOW(), NOW());
+
+-- 5. Новые блоки питания
+INSERT INTO components (name, category, brand, specs, created_at, updated_at) VALUES
+  ('Corsair RM550X',               'psu','Corsair','{"power":550}',  NOW(), NOW()),
+  ('EVGA SuperNOVA 1000 G+',       'psu','EVGA',   '{"power":1000}', NOW(), NOW()),
+  ('Seasonic Prime TX-1000',       'psu','Seasonic','{"power":1000}', NOW(), NOW()),
+  ('be quiet! Straight Power 11',  'psu','be quiet!','{"power":550}',NOW(), NOW()),
+  ('Thermaltake Toughpower GF1',   'psu','Thermaltake','{"power":750}',NOW(), NOW());
+
+-- 6. Новые корпуса
+INSERT INTO components (name, category, brand, specs, created_at, updated_at) VALUES
+  ('Cooler Master NR200',         'case','Cooler Master','{"gpu_max_length":330,"cooler_max_height":155}', NOW(), NOW()),
+  ('Fractal Design Node 304',     'case','Fractal','{"gpu_max_length":315,"cooler_max_height":56}', NOW(), NOW()),
+  ('Corsair 4000D',               'case','Corsair','{"gpu_max_length":360,"cooler_max_height":170}', NOW(), NOW()),
+  ('Lian Li O11 Dynamic',         'case','Lian Li','{"gpu_max_length":420,"cooler_max_height":165}', NOW(), NOW()),
+  ('Phanteks Enthoo Pro',         'case','Phanteks','{"gpu_max_length":420,"cooler_max_height":190}', NOW(), NOW());
+
+-- 7. Новые SSD
+INSERT INTO components (name, category, brand, specs, created_at, updated_at) VALUES
+  ('Samsung 980 Pro 1TB',   'ssd','Samsung','{"form_factor":"M.2","interface":"PCIe 4.0"}', NOW(), NOW()),
+  ('WD Black SN770 1TB',    'ssd','WD',     '{"form_factor":"M.2","interface":"PCIe 4.0"}', NOW(), NOW()),
+  ('Crucial P5 500GB',      'ssd','Crucial','{"form_factor":"M.2","interface":"PCIe 3.0"}', NOW(), NOW()),
+  ('Kingston A2000 500GB',  'ssd','Kingston','{"form_factor":"M.2","interface":"PCIe 3.0"}', NOW(), NOW());
+
+-- 8. Новые HDD
+INSERT INTO components (name, category, brand, specs, created_at, updated_at) VALUES
+  ('WD Red Plus 4TB',       'hdd','Western Digital','{"form_factor":"3.5","interface":"SATA III","rpm":5400}', NOW(), NOW()),
+  ('Seagate IronWolf 4TB',  'hdd','Seagate','{"form_factor":"3.5","interface":"SATA III","rpm":5900}', NOW(), NOW());

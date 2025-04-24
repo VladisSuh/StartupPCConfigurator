@@ -3,6 +3,7 @@ package usecase
 import (
 	"StartupPCConfigurator/internal/config/repository"
 	"StartupPCConfigurator/internal/domain"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -22,6 +23,10 @@ type ConfigService interface {
 	FetchUserConfigurations(userId uuid.UUID) ([]domain.Configuration, error)
 	UpdateConfiguration(userId uuid.UUID, configId string, name string, comps []domain.ComponentRef) (domain.Configuration, error)
 	DeleteConfiguration(userId uuid.UUID, configId string) error
+	GenerateConfigurations(refs []domain.ComponentRef) ([][]domain.Component, error)
+	GetUseCaseBuild(usecaseName string) ([]domain.Component, error)
+	GenerateUseCaseConfigs(usecaseName string, refs []domain.ComponentRef) ([][]domain.Component, error)
+	ListUseCases() ([]domain.UseCase, error)
 }
 
 type configService struct {
@@ -107,4 +112,236 @@ func (s *configService) DeleteConfiguration(userId uuid.UUID, configId string) e
 		return err
 	}
 	return nil
+}
+
+func (s *configService) GenerateConfigurations(refs []domain.ComponentRef) ([][]domain.Component, error) {
+	// 1) По refs собираем выбранные компоненты
+	var selected []domain.Component
+	for _, ref := range refs {
+		comp, err := s.repo.GetComponentByName(ref.Category, ref.Name)
+		if err != nil {
+			return nil, fmt.Errorf("component not found: %s / %s", ref.Category, ref.Name)
+		}
+		selected = append(selected, comp)
+	}
+
+	// 2) Подгружаем все компоненты из репозитория
+	all, err := s.repo.GetComponents("", "")
+	if err != nil {
+		return nil, fmt.Errorf("failed to load components: %w", err)
+	}
+
+	// 3) Генерируем все совместимые сборки из полного списка
+	configs := GenerateConfigurations(all)
+
+	// 4) Фильтруем, оставляя только сборки, содержащие все выбранные компоненты
+	//    при этом сравниваем категории в нижнем регистре
+	filtered := make([][]domain.Component, 0, len(configs))
+	for _, combo := range configs {
+		ok := true
+		for _, want := range selected {
+			wantCat := strings.ToLower(want.Category) // <-- нормализация want
+			found := false
+			for _, have := range combo {
+				if strings.ToLower(have.Category) == wantCat && have.Name == want.Name {
+					found = true
+					break
+				}
+			}
+			if !found {
+				ok = false
+				break
+			}
+		}
+		if ok {
+			filtered = append(filtered, combo)
+		}
+	}
+
+	return filtered, nil
+}
+
+func (s *configService) GetUseCaseBuild(usecaseName string) ([]domain.Component, error) {
+	// а) Берём правило для этого сценария
+	rule, ok := ScenarioRules[usecaseName]
+	if !ok {
+		return nil, fmt.Errorf("unknown use case %q", usecaseName)
+	}
+
+	// б) Загружаем все компоненты из репозитория
+	all, err := s.repo.GetComponents("", "")
+	if err != nil {
+		return nil, fmt.Errorf("failed to load components: %w", err)
+	}
+
+	// в) Генерируем все совместимые сборки
+	combos := GenerateConfigurations(all)
+
+	// г) Фильтруем по сценарию
+	for _, combo := range combos {
+		if matchesScenario(combo, rule) {
+			// для простоты возвращаем первую подходящую сборку
+			return combo, nil
+		}
+	}
+
+	return nil, fmt.Errorf("no builds found for use case %q", usecaseName)
+}
+
+// 4) Функция matchesScenario рядом, в том же файле
+func matchesScenario(combo []domain.Component, rule ScenarioRule) bool {
+	var cpu, mb, ram, gpu, psu, cs *domain.Component
+
+	// разбираем combo по категориям
+	for i := range combo {
+		switch strings.ToLower(combo[i].Category) {
+		case "cpu":
+			cpu = &combo[i]
+		case "motherboard":
+			mb = &combo[i]
+		case "ram":
+			ram = &combo[i]
+		case "gpu":
+			gpu = &combo[i]
+		case "psu":
+			psu = &combo[i]
+		case "case":
+			cs = &combo[i]
+		}
+	}
+	// проверяем, что все ключевые компоненты на месте
+	if cpu == nil || mb == nil || ram == nil || psu == nil || cs == nil {
+		return false
+	}
+
+	// распаковываем specs
+	specsCPU := parseSpecs(cpu.Specs)
+	specsMB := parseSpecs(mb.Specs)
+	specsRAM := parseSpecs(ram.Specs)
+	specsPSU := parseSpecs(psu.Specs)
+	specsCase := parseSpecs(cs.Specs)
+
+	// CPU: сокет и TDP
+	sock := specsCPU["socket"].(string)
+	if !contains(rule.CPUSocketWhitelist, sock) {
+		return false
+	}
+	if tdp, ok := specsCPU["tdp"].(float64); ok && int(tdp) > rule.MaxCPUTDP {
+		return false
+	}
+
+	// Motherboard: поддержка типа RAM
+	if specsMB["ram_type"].(string) != rule.RAMType {
+		return false
+	}
+
+	// RAM: тип и объём
+	if specsRAM["ram_type"].(string) != rule.RAMType {
+		return false
+	}
+	if cap, ok := specsRAM["capacity"].(float64); ok && int(cap) < rule.MinRAM {
+		return false
+	}
+
+	// GPU: проверяем только если сценарий требует дискретку
+	if rule.MinGPUMemory > 0 {
+		if gpu == nil {
+			return false
+		}
+		specsGPU := parseSpecs(gpu.Specs)
+		// ожидаем строку вида "12GB"
+		if memStr, ok := specsGPU["memory"].(string); ok {
+			var memVal int
+			fmt.Sscanf(memStr, "%dGB", &memVal)
+			if memVal < rule.MinGPUMemory {
+				return false
+			}
+		} else {
+			return false
+		}
+	}
+
+	// PSU: мощность
+	if pow, ok := specsPSU["power"].(float64); ok && int(pow) < rule.MinPSUPower {
+		return false
+	}
+
+	// Case: форм-фактор
+	if ff, ok := specsCase["form_factor_support"].(string); ok {
+		if !contains(rule.CaseFormFactors, ff) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// Вспомогательная: распаковка JSONB в map[string]interface{}
+func parseSpecs(raw json.RawMessage) map[string]interface{} {
+	var m map[string]interface{}
+	json.Unmarshal(raw, &m)
+	return m
+}
+
+// Вспомогательная: поиск строки в срезе
+func contains(ss []string, s string) bool {
+	for _, x := range ss {
+		if strings.EqualFold(x, s) {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *configService) GenerateUseCaseConfigs(usecaseName string, refs []domain.ComponentRef) ([][]domain.Component, error) {
+	// 1) Получаем правило
+	rule, ok := ScenarioRules[usecaseName]
+	if !ok {
+		return nil, fmt.Errorf("unknown use case %q", usecaseName)
+	}
+	// 2) Собираем все компоненты по refs (как в GenerateConfigurations)
+	var selected []domain.Component
+	for _, ref := range refs {
+		comp, err := s.repo.GetComponentByName(ref.Category, ref.Name)
+		if err != nil {
+			return nil, fmt.Errorf("component not found: %s/%s", ref.Category, ref.Name)
+		}
+		selected = append(selected, comp)
+	}
+	// 3) Загружаем всё и получаем все совместимые комбо
+	all, err := s.repo.GetComponents("", "")
+	if err != nil {
+		return nil, err
+	}
+	combos := GenerateConfigurations(all)
+	// 4) Фильтр: содержит все selected **и** соответствует сценарию
+	var out [][]domain.Component
+	for _, combo := range combos {
+		if containsAll(combo, selected) && matchesScenario(combo, rule) {
+			out = append(out, combo)
+		}
+	}
+	return out, nil
+}
+
+// вспомогательный: combo содержит все want
+func containsAll(combo, want []domain.Component) bool {
+	for _, w := range want {
+		ok := false
+		for _, c := range combo {
+			if strings.EqualFold(c.Category, w.Category) && c.Name == w.Name {
+				ok = true
+				break
+			}
+		}
+		if !ok {
+			return false
+		}
+	}
+	return true
+}
+
+// ListUseCases возвращает все сценарии из БД
+func (s *configService) ListUseCases() ([]domain.UseCase, error) {
+	return s.repo.GetUseCases()
 }
