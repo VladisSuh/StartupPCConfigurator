@@ -5,6 +5,7 @@ import (
 	"StartupPCConfigurator/internal/auth/repository"
 	"StartupPCConfigurator/internal/auth/service"
 	"StartupPCConfigurator/pkg/middleware"
+	"os"
 
 	"database/sql"
 	"log"
@@ -15,13 +16,16 @@ import (
 
 func main() {
 	// 1. Конфигурация (строка подключения, секрет JWT и т.д.)
-	dbURL := "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable"
-	jwtSecret := "secret_key" // Обычно берется из env
+	jwtSecret := os.Getenv("JWT_SECRET") // Обычно берется из env
 
 	// 2. Подключение к базе данных
-	db, err := sql.Open("postgres", dbURL)
+	dsn := os.Getenv("DB_CONN_STR")
+	if dsn == "" {
+		log.Fatal("DB_CONN_STR не задан")
+	}
+	db, err := sql.Open("postgres", dsn)
 	if err != nil {
-		log.Fatal("Database connection error:", err)
+		log.Fatalf("Failed to init DB: %v", err)
 	}
 	defer db.Close()
 

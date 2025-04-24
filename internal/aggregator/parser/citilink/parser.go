@@ -1,22 +1,21 @@
-package dns
+package citilink
 
 import (
-	"StartupPCConfigurator/internal/aggregator/usecase"
 	"context"
 	"fmt"
-	"github.com/chromedp/cdproto/network"
-	"github.com/chromedp/cdproto/page"
 	"log"
-	"math/rand"
 	"strings"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/chromedp/cdproto/network"
+	"github.com/chromedp/cdproto/page"
 	"github.com/chromedp/chromedp"
+
+	"StartupPCConfigurator/internal/aggregator/usecase"
 )
 
-// DNSParser содержит логику парсинга конкретного магазина DNS
-type DNSParser struct {
+type CitilinkParser struct {
 	logger *log.Logger
 }
 
@@ -88,100 +87,65 @@ func NewStealthContext(parent context.Context, logger *log.Logger) (context.Cont
 	return ctx, cancel
 }
 
-// NewDNSParser конструктор (может принимать иные параметры)
-func NewDNSParser(logger *log.Logger) *DNSParser {
-	return &DNSParser{logger: logger}
+func NewCitilinkParser(logger *log.Logger) *CitilinkParser {
+	return &CitilinkParser{logger: logger}
 }
 
-func (p *DNSParser) ParseProductPage(_ctx context.Context, url string) (*ParsedItem, error) {
-	logger := p.logger
+func (p *CitilinkParser) ParseProductPage(ctx context.Context, url string) (*ParsedItem, error) {
+	p.logger.Printf("Parsing Citilink page: %s", url)
 
-	// Вместо chromedp.NewContext делаем
-	ctx, cancel := NewStealthContext(_ctx, logger)
+	// (1) Создаём Stealth-контекст, как для DNS
+	ctx, cancel := NewStealthContext(ctx, p.logger)
 	defer cancel()
 
-	// 2. Случайная задержка (имитация человека, если нужно)
-	pause := time.Duration(rand.Intn(5)+5) * time.Second // от 5 до 10 сек
-	time.Sleep(pause)
-
-	// 3. Выполняем сценарий: зайти на url, дождаться загрузки, взять HTML
+	// (2) Навигация + ожидание
 	var html string
-	err := chromedp.Run(ctx,
+	if err := chromedp.Run(ctx,
 		chromedp.Navigate(url),
-		chromedp.WaitVisible(`div.product-buy__price`, chromedp.ByQuery),
+		chromedp.WaitVisible(`.ProductCardLayout__price`, chromedp.ByQuery),
 		chromedp.OuterHTML("html", &html),
-	)
-	if err != nil {
+	); err != nil {
 		return nil, fmt.Errorf("chromedp run error: %w", err)
 	}
 
-	// 4. Парсим HTML через goquery
+	// (3) Goquery
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 	if err != nil {
 		return nil, fmt.Errorf("goquery parse error: %w", err)
 	}
 
-	// или короче:
-	// doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
-
-	// 5. Извлекаем нужные данные
-	// Примерно по тем же селекторам, что в Python
+	// (4) Извлечение данных под новые селекторы Citilink
 	item := &ParsedItem{}
+	item.Name = doc.Find("h1.ProductHeading__title").Text()
+	item.Price = doc.Find(".ProductCardLayout__price-current").Text()
+	item.Description = doc.Find(".ProductCardDescription__text").Text()
+	item.Availability = doc.Find(".ProductAvailability__status").Text()
+	item.Category = doc.Find(".Breadcrumbs__item:last-child a").Text()
 
-	title := doc.Find("div.product-card-description__title").First().Text()
-	item.Name = title
-
-	price := doc.Find("div.product-buy__price").First().Text()
-	item.Price = price
-
-	desc := doc.Find("div.product-card-description-text").First().Text()
-	item.Description = desc
-
-	availability := doc.Find("a.order-avail-wrap__link.ui-link.ui-link_blue").First().Text()
-	if availability == "" {
-		availability = "Товара нет в наличии"
+	// картинка и дополнительные изображения
+	if src, ok := doc.Find(".ProductGallery__main img").Attr("src"); ok {
+		item.MainImage = src
 	}
-	item.Availability = availability
-
-	// Пример получения главной картинки:
-	mainPic, _ := doc.Find("img.product-images-slider__main-img").Attr("src")
-	item.MainImage = mainPic
-
-	// Пример парсинга списка картинок
-	var pictures []string
-	doc.Find("img.product-images-slider__img.loaded.tns-complete").Each(func(i int, s *goquery.Selection) {
-		if src, ok := s.Attr("data-src"); ok {
-			pictures = append(pictures, src)
+	doc.Find(".ProductGallery__thumbs img").Each(func(i int, s *goquery.Selection) {
+		if src, ok := s.Attr("src"); ok {
+			item.Images = append(item.Images, src)
 		}
 	})
-	item.Images = pictures
 
-	// Категорию можно искать, например:
-	category := "Категория не найдена"
-	doc.Find("span").Each(func(i int, s *goquery.Selection) {
-		// Логика поиска
-		if goquery.NodeName(s) == "span" && s.AttrOr("data-go-back-catalog", "") != "" {
-			category = s.Text()
+	// характеристики — прим. отличаются по классу
+	doc.Find(".ProductSpecs__row").Each(func(i int, s *goquery.Selection) {
+		k := s.Find(".ProductSpecs__name").Text()
+		v := s.Find(".ProductSpecs__value").Text()
+		if k != "" {
+			item.Characteristics = append(item.Characteristics, KV{Key: k, Value: v})
 		}
 	})
-	item.Category = category
 
-	// Пример характеристики:
-	var specs []KV
-	doc.Find("div.product-characteristics__spec-title").Each(func(i int, s *goquery.Selection) {
-		specTitle := s.Text()
-		specValue := doc.Find("div.product-characteristics__spec-value").Eq(i).Text()
-		specs = append(specs, KV{Key: specTitle, Value: specValue})
-	})
-	item.Characteristics = specs
-
-	// вернуть результат
 	return item, nil
 }
 
-// После уже существующего ParseProductPage(...)
-func (p *DNSParser) Parse(ctx context.Context, url string) (*usecase.ParsedItem, error) {
-	// просто делегируем, но возвращаем нужный usecase.ParsedItem
+// Parse — обвязка под usecase.Parser
+func (p *CitilinkParser) Parse(ctx context.Context, url string) (*usecase.ParsedItem, error) {
 	prod, err := p.ParseProductPage(ctx, url)
 	if err != nil {
 		return nil, err
@@ -193,7 +157,7 @@ func (p *DNSParser) Parse(ctx context.Context, url string) (*usecase.ParsedItem,
 	}, nil
 }
 
-// ParsedItem структура для хранения результата
+// структура результата внутри пакета parser/citilink
 type ParsedItem struct {
 	Name            string
 	Price           string
@@ -205,7 +169,6 @@ type ParsedItem struct {
 	Characteristics []KV
 }
 
-// Пример для хранения ключ-значение:
 type KV struct {
 	Key   string
 	Value string

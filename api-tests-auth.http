@@ -32,7 +32,7 @@ Content-Type: application/json
 #       "expires_at":   "..."
 #   }
 ################################################################################
-@access_token  = 
+@access_token  = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImZvcm1haWx2bGFkaXNAZ21haWwuY29tIiwiZXhwIjoxNzQ1NTY1NzU0LCJ1c2VyX2lkIjoiNTlmOTQyZWEtZWEzYS00OWNiLWI2MTQtNDJmNGYzYmUxMDE0In0.HDaojgwFZ949PMOieEoD9QZleo5XY_AGIqpdFtINH3U
 @refresh_token = SGppWH0uFI3Iz5Y6Hpk3HgTQs4stSF7aR0cd32XK_LulHcJ1OE8Z9Lf_Enm-bBBFy3qR_k-4ePUUZb_JCaWCKQ==
 
 ################################################################################
@@ -49,7 +49,7 @@ Content-Type: application/json
   "refresh_token": "{{refresh_token}}"
 }
 
-# скопируйте новые access/refresh‑token’ы, если нужны
+### скопируйте новые access/refresh‑token’ы, если нужны
 
 ################################################################################
 ### 5. запрос на сброс пароля
@@ -60,7 +60,7 @@ Content-Type: application/json
   "email": "{{email}}"
 }
 
-# в письме/логе будет ссылка вида
+### в письме/логе будет ссылка вида
 # http://localhost:8080/auth/reset_password?token=XYZ
 # скопируйте значение XYZ:
 
@@ -113,7 +113,7 @@ GET {{config_host}}/config/components
 # Authorization: Bearer {{access_token}}
 
 ### 11.1 получить компоненты по категории
-GET {{config_host}}/config/components?category=GPU
+GET {{config_host}}/config/components?category=motherboard
 Authorization: Bearer {{access_token}}
 
 ### 11.2 поиск компонентов по названию
@@ -167,7 +167,7 @@ Authorization: Bearer {{access_token}}
 
 ################################################################################
 ### 14. получить совместимые компоненты
-GET {{config_host}}/config/compatible?category=Motherboard&cpuSocket=AM5&memoryType=DDR5
+GET {{config_host}}/config/compatible?category=motherboard&cpuSocket=AM4
 Authorization: Bearer {{access_token}}
 
 ################################################################################

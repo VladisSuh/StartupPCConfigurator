@@ -13,6 +13,7 @@ services:
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
       - REDIS_URL=redis:6379
       - AUTH_SERVICE_PORT=8001
+      - JWT_SECRET=${JWT_SECRET:-secret_key}
     ports:
       - "8001:8001"
     depends_on:
@@ -31,6 +32,7 @@ services:
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
       - REDIS_URL=redis:6379
       - CONFIG_SERVICE_PORT=8002
+      - JWT_SECRET=${JWT_SECRET:-secret_key}
     ports:
       - "8002:8002"
     depends_on:
@@ -66,6 +68,7 @@ services:
       - AUTH_SERVICE_URL=http://auth:8001
       - CONFIG_SERVICE_URL=http://config:8002
       - AGGREGATOR_SERVICE_URL=http://aggregator:8003
+      - JWT_SECRET=${JWT_SECRET:-secret_key}
       # ... возможно, здесь же RABBITMQ_URL, REDIS_URL, etc
     ports:
       - "8080:8080"
