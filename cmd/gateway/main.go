@@ -33,28 +33,20 @@ func main() {
 	router.GET("/config/compatible", reverseProxyPath(configURL, "/compatible"))
 	router.GET("/config/usecases", reverseProxyPath(configURL, "/usecases"))
 	router.POST("/config/generate", reverseProxyPath(configURL, "/generate"))
-	// GET /config/usecase/:name → проксируем к /usecase/{name}
+
 	router.GET("/config/usecase/:name", func(c *gin.Context) {
 		name := c.Param("name")
 		c.Request.URL.Path = "/usecase/" + name
-		reverseProxy(configURL)(c)
+		proxyKeepPath(configURL)(c) // ← вместо reverseProxy
 	})
 
-	// POST /config/usecase/:name/generate → проксируем к /usecase/{name}/generate
 	router.POST("/config/usecase/:name/generate", func(c *gin.Context) {
 		name := c.Param("name")
 		c.Request.URL.Path = "/usecase/" + name + "/generate"
-		reverseProxy(configURL)(c)
+		proxyKeepPath(configURL)(c) // ← вместо reverseProxy
 	})
 
-	// 🔐 Защищённые ручки config-сервиса через /config-secure/*
-	configProtected := router.Group("/config-secure")
-	configProtected.Use(middleware.AuthMiddleware(jwtSecret))
-	{
-		configProtected.Any("/*proxyPath", reverseProxy(configURL))
-	}
-
-	// 🔐 Защищённые ручки aggregator-сервиса через /offers/*
+	// Защищённые ручки aggregator-сервиса через /offers/*
 	offersGroup := router.Group("/offers")
 	offersGroup.Use(middleware.AuthMiddleware(jwtSecret))
 	{
@@ -91,6 +83,18 @@ func reverseProxyPath(target, path string) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 		c.Request.URL.Path = path
+		proxy.ServeHTTP(c.Writer, c.Request)
+	}
+}
+
+// proxyKeepPath — не переписывает путь, просто проксирует как есть
+func proxyKeepPath(target string) gin.HandlerFunc {
+	remote, err := url.Parse(target)
+	if err != nil {
+		log.Fatalf("invalid proxy url: %v", err)
+	}
+	proxy := httputil.NewSingleHostReverseProxy(remote)
+	return func(c *gin.Context) {
 		proxy.ServeHTTP(c.Writer, c.Request)
 	}
 }

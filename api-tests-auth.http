@@ -288,7 +288,7 @@ GET {{config_host}}/config/usecases
 
 ################################################################################
 ### 24. получить готовую сборку по сценарию
-GET {{config_host}}/config/usecase/gaming
+GET {{config_host}}/config/usecase/office
 # Authorization: Bearer {{access_token}}  (необязательно)
 
 ################################################################################
