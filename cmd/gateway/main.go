@@ -46,6 +46,13 @@ func main() {
 		proxyKeepPath(configURL)(c) // ← вместо reverseProxy
 	})
 
+	// Защищённые ручки config-сервиса через /config-secure/*
+	configProtected := router.Group("/config-secure")
+	configProtected.Use(middleware.AuthMiddleware(jwtSecret))
+	{
+		configProtected.Any("/*proxyPath", reverseProxy(configURL))
+	}
+
 	// Защищённые ручки aggregator-сервиса через /offers/*
 	offersGroup := router.Group("/offers")
 	offersGroup.Use(middleware.AuthMiddleware(jwtSecret))
