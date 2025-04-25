@@ -246,7 +246,113 @@ paths:
                   $ref: '#/components/schemas/Component'
         '400':
           description: Неверные параметры запроса
+  /config/compatible:
+    get:
+      tags: [Configurator]
+      summary: Получить список совместимых компонентов
+      description: |
+        Возвращает компоненты указанной категории, которые
+        совместимы с уже выбранными деталями сборки.
+      parameters:
+        - in: query
+          name: category
+          required: true
+          schema:
+            type: string
+            enum: [cpu, gpu, motherboard, ram, storage, cooler, case, soundcard, power_supply]
+        - in: query
+          name: cpuSocket
+          schema:
+            type: string
+          description: Сокет выбранного CPU (например, AM4)
+        - in: query
+          name: memoryType
+          schema:
+            type: string
+          description: Тип памяти (DDR4, DDR5)
+      responses:
+        '200':
+          description: Список совместимых компонентов
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Component'
+        '400':
+          description: Неверные параметры запроса
 
+  /config/newconfig:
+    post:
+      tags: [Configurator]
+      summary: Создать новую конфигурацию
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateConfigRequest'
+      responses:
+        '201':
+          description: Конфигурация создана
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Configuration'
+        '400': { description: Ошибка валидации }
+        '401': { description: Не авторизован }
+
+  /config/userconf:
+    get:
+      tags: [Configurator]
+      summary: Получить конфигурации пользователя
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Список конфигураций
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Configuration'
+        '401': { description: Не авторизован }
+
+  /config/newconfig/{configId}:
+    parameters:
+      - in: path
+        name: configId
+        required: true
+        schema:
+          type: string
+        description: ID конфигурации
+    put:
+      tags: [Configurator]
+      summary: Обновить конфигурацию
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateConfigRequest'
+      responses:
+        '200': { description: Конфигурация обновлена,
+                 content: { application/json: { schema: { $ref: '#/components/schemas/Configuration' } } } }
+        '400': { description: Ошибка валидации }
+        '401': { description: Не авторизован }
+        '404': { description: Конфигурация не найдена }
+    delete:
+      tags: [Configurator]
+      summary: Удалить конфигурацию
+      security: [{ bearerAuth: [] }]
+      responses:
+        '204': { description: Конфигурация удалена }
+        '401': { description: Не авторизован }
+        '403': { description: Нет прав на удаление }
+        '404': { description: Конфигурация не найдена }
+        
   /config/newconfig:
     post:
       tags:
