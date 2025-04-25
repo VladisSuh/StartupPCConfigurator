@@ -16,4 +16,5 @@ type Repository interface {
 	UpsertOffer(ctx context.Context, compID string, shopID int64, price float64, availability, url string) error
 	InsertPriceHistory(ctx context.Context, compID string, shopID int64, price float64) error
 	UpdateJobStatus(ctx context.Context, jobID int64, status string, message interface{}) error
+	BulkUpsertOffers(ctx context.Context, recs []ImportRecord) error
 }

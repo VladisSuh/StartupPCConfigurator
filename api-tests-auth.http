@@ -32,7 +32,7 @@ Content-Type: application/json
 #       "expires_at":   "..."
 #   }
 ################################################################################
-@access_token  = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImtyYXNpbmFfMjAwM0BtYWlsLnJ1IiwiZXhwIjoxNzQ1NjcwNjEzLCJ1c2VyX2lkIjoiYjViZDNhMzctZTQzZi00ZTU3LTlhOWItNDI0NTZmNWFiMTY4In0.qQPJyQgCNyIkibbgKjOoy_wgHTZZo7Fei6zDk5rFvq0
+@access_token  = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImtyYXNpbmFfMjAwM0BtYWlsLnJ1IiwiZXhwIjoxNzQ1Njk2NDIyLCJ1c2VyX2lkIjoiYjAyYmRlNmItOGFjNC00OWRkLThlY2EtNTgzMDA5YWQwYWVlIn0.71HfTalFIP1OCnM8sGF9uUMFn4p4p-OrXVZVGwUMvLo
 @refresh_token = SGppWH0uFI3Iz5Y6Hpk3HgTQs4stSF7aR0cd32XK_LulHcJ1OE8Z9Lf_Enm-bBBFy3qR_k-4ePUUZb_JCaWCKQ==
 
 ################################################################################
@@ -138,6 +138,10 @@ Authorization: Bearer {{access_token}}
     {
       "category": "GPU",
       "name": "NVIDIA GeForce RTX 3060"
+    },
+    {
+      "category": "motherboard",
+      "name": "MSI B550 Tomahawk"
     }
   ]
 }
@@ -156,11 +160,11 @@ Authorization: Bearer {{access_token}}
   "components": [
     {
       "category": "CPU",
-      "name": "Intel Core i5-12400F"
+      "name": "AMD Ryzen 7 7700X"
     },
     {
       "category": "GPU",
-      "name": "AMD RX 6600 XT"
+      "name": "AMD Radeon RX 6700 XT"
     }
   ]
 }
@@ -220,7 +224,7 @@ Authorization: Bearer {{access_token}}
 
 ################################################################################
 ### A. Несовместимость по socket (CPU ↔︎ Motherboard)
-@config_name = InvalidSocketBuild
+@config_name1 = InvalidSocketBuild
 
 POST {{config_host}}/config-secure/newconfig
 Content-Type: application/json
@@ -251,7 +255,7 @@ Content-Type: application/json
 
 ################################################################################
 ### B. Несовместимость по типу памяти (RAM ↔ Motherboard)
-@config_name = InvalidRamBuild
+@config_name2 = InvalidRamBuild
 
 POST {{config_host}}/config-secure/newconfig
 Content-Type: application/json
@@ -334,3 +338,8 @@ Content-Type: application/json
     }
   ]
 }
+###################Не работает в REST-тестах
+POST http://localhost:8080/offers/import
+Content-Type: multipart/form-data
+
+file=@./dns_pricelist.xlsx;type=application/vnd.openxmlformats-officedocument.spreadsheetml.sheet

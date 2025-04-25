@@ -186,3 +186,49 @@ UPDATE update_jobs
 	_, err := r.db.ExecContext(ctx, q, args...)
 	return err
 }
+
+// record — структура, совпадающая с тем, что передаёт usecase
+func (r *repoImpl) BulkUpsertOffers(
+	ctx context.Context,
+	recs []usecase.ImportRecord, // надо тип record вынести в usecase
+) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.PrepareContext(ctx, `
+INSERT INTO offers
+  (component_id, shop_id, price, currency, availability, url, fetched_at)
+VALUES
+  ($1, (SELECT id FROM shops WHERE code = $2), $3, $4, $5, $6, NOW())
+ON CONFLICT (component_id, shop_id) DO UPDATE
+  SET price = EXCLUDED.price,
+      currency = EXCLUDED.currency,
+      availability = EXCLUDED.availability,
+      url = EXCLUDED.url,
+      fetched_at = EXCLUDED.fetched_at
+`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	for _, r := range recs {
+		if _, err := stmt.ExecContext(
+			ctx,
+			r.ComponentID,
+			r.ShopCode,
+			r.Price,
+			r.Currency,
+			r.Availability,
+			r.URL,
+		); err != nil {
+			return err
+		}
+		// можно тут же писать и в price_history, если нужно
+	}
+
+	return tx.Commit()
+}

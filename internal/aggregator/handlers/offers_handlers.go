@@ -44,3 +44,25 @@ func (h *OffersHandler) GetOffers(c *gin.Context) {
 	// Успешный ответ
 	c.JSON(http.StatusOK, offers)
 }
+
+// POST /offers/import
+func (h *OffersHandler) UploadPriceList(c *gin.Context) {
+	fileHeader, err := c.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "file is required"})
+		return
+	}
+	f, err := fileHeader.Open()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "cannot open file"})
+		return
+	}
+	defer f.Close()
+
+	// вызываем usecase
+	if err := h.usecase.ImportPriceList(c.Request.Context(), f); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.Status(http.StatusNoContent)
+}

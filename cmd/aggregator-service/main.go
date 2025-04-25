@@ -84,6 +84,7 @@ func main() {
 	// === 6. Запуск HTTP‑сервера ===
 	r := gin.Default()
 	r.GET("/offers", offersHandler.GetOffers)
+	r.POST("/offers/import", offersHandler.UploadPriceList)
 
 	port := os.Getenv("AGGREGATOR_PORT")
 	if port == "" {

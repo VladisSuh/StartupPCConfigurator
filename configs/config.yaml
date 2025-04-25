@@ -475,7 +475,40 @@ paths:
                 $ref: '#/components/schemas/OffersResponse'
         '400':
           description: Ошибка валидации (например, отсутсвует componentId)
-
+  /offers/import/:
+    post:
+      tags:
+        - Aggregator
+      summary: Импорт прайс-листа из Excel
+      description: Принимает файл XLSX, парсит его и bulk-upsert’ит цены в таблицы offers и price_history.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: XLSX-файл прайс-листа
+              required:
+                - file
+      responses:
+        '204':
+          description: Прайс-лист успешно импортирован
+        '400':
+          description: Некорректный запрос или неверный формат файла
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера при обработке файла
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 components:
   schemas:
     # -------- Auth Schemas --------
@@ -632,7 +665,16 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Offer'
-
+    ErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        code:
+          type: integer
+      required:
+        - message
+        - code
     # -------- Notifications (пример, если нужно) --------
     Notification:
       type: object

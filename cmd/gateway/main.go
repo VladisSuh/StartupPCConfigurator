@@ -57,7 +57,7 @@ func main() {
 	offersGroup := router.Group("/offers")
 	offersGroup.Use(middleware.AuthMiddleware(jwtSecret))
 	{
-		offersGroup.Any("/*proxyPath", reverseProxy(agrURL))
+		offersGroup.Any("/*proxyPath", proxyKeepPath(agrURL))
 	}
 
 	log.Println("Gateway запущен на :8080")
