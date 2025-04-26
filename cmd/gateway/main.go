@@ -57,6 +57,7 @@ func main() {
 	offersGroup := router.Group("/offers")
 	offersGroup.Use(middleware.AuthMiddleware(jwtSecret))
 	{
+		offersGroup.Any("", proxyKeepPath(agrURL))
 		offersGroup.Any("/*proxyPath", proxyKeepPath(agrURL))
 	}
 

@@ -239,3 +239,13 @@ VALUES ('NZXT H510', 'case', 'NZXT',
 -- Пример базовой «офисной» модели на 450 Вт
 INSERT INTO components (name, category, brand, specs)
 VALUES ('Seasonic Core GM-450', 'psu', 'Seasonic', '{"power": 450}');
+
+
+INSERT INTO shops (code, name, base_url, api_endpoint)
+VALUES
+    ('DNS', 'DNS Shop', 'https://www.dns-shop.ru', NULL)
+;
+INSERT INTO shops (code, name, base_url, api_endpoint)
+VALUES
+    ('Citilink', 'Citilink Shop', 'https://www.citilink.ru/', NULL)
+;

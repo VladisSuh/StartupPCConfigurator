@@ -66,8 +66,8 @@ var (
 type Offer struct {
 	ID           int64   `json:"-"`
 	ComponentID  string  `json:"componentId"`
-	ShopID       string  `json:"shopId"`
-	ShopCode     int64   `json:"shopCode"`
+	ShopID       int64   `json:"shopId"`
+	ShopCode     string  `json:"shopCode"`
 	ShopName     string  `json:"shopName"`
 	Price        float64 `json:"price"`
 	Currency     string  `json:"currency"`
