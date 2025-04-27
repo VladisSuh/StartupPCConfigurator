@@ -5,6 +5,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"strings"
 
 	"StartupPCConfigurator/pkg/middleware"
 
@@ -22,56 +23,55 @@ func main() {
 	configURL := os.Getenv("CONFIG_SERVICE_URL")
 	agrURL := os.Getenv("AGGREGATOR_SERVICE_URL")
 
-	router := gin.Default()
-	router.Use(cors.Default())
+	r := gin.Default()
+	r.Use(cors.Default())
 
-	// 🔓 Публичный /auth/*
-	router.Any("/auth/*proxyPath", reverseProxy(authURL))
+	// ---------- AUTH --------------------------------------------------------
+	r.Any("/auth/*proxyPath", reverseProxy(authURL))
 
-	// 🔓 Публичные ручки config-сервиса
-	router.GET("/config/components", reverseProxyPath(configURL, "/components"))
-	router.GET("/config/compatible", reverseProxyPath(configURL, "/compatible"))
-	router.GET("/config/usecases", reverseProxyPath(configURL, "/usecases"))
-	router.POST("/config/generate", reverseProxyPath(configURL, "/generate"))
+	// ---------- CONFIG – публичные -----------------------------------------
+	r.GET("/config/components", reverseProxyPath(configURL, "/components"))
+	r.GET("/config/compatible", reverseProxyPath(configURL, "/compatible"))
+	r.GET("/config/usecases", reverseProxyPath(configURL, "/usecases"))
+	r.POST("/config/generate", reverseProxyPath(configURL, "/generate"))
 
-	router.GET("/config/usecase/:name", func(c *gin.Context) {
-		name := c.Param("name")
-		c.Request.URL.Path = "/usecase/" + name
-		proxyKeepPath(configURL)(c) // ← вместо reverseProxy
+	r.GET("/config/usecase/:name", func(c *gin.Context) {
+		c.Request.URL.Path = "/usecase/" + c.Param("name")
+		proxyKeepPath(configURL)(c)
+	})
+	r.POST("/config/usecase/:name/generate", func(c *gin.Context) {
+		c.Request.URL.Path = "/usecase/" + c.Param("name") + "/generate"
+		proxyKeepPath(configURL)(c)
 	})
 
-	router.POST("/config/usecase/:name/generate", func(c *gin.Context) {
-		name := c.Param("name")
-		c.Request.URL.Path = "/usecase/" + name + "/generate"
-		proxyKeepPath(configURL)(c) // ← вместо reverseProxy
-	})
-
-	// Защищённые ручки config-сервиса через /config-secure/*
-	configProtected := router.Group("/config-secure")
-	configProtected.Use(middleware.AuthMiddleware(jwtSecret))
+	// ---------- CONFIG – защищённые (JWT) ----------------------------------
+	cfgSec := r.Group("/config", middleware.AuthMiddleware(jwtSecret))
 	{
-		configProtected.Any("/*proxyPath", reverseProxy(configURL))
+		cfgSec.POST("/newconfig", proxyStripPrefix(configURL, "/config"))
+		cfgSec.GET("/userconf", proxyStripPrefix(configURL, "/config"))
+		cfgSec.PUT("/newconfig/:configId", proxyStripPrefix(configURL, "/config"))
+		cfgSec.DELETE("/newconfig/:configId", proxyStripPrefix(configURL, "/config"))
 	}
 
-	// Защищённые ручки aggregator-сервиса через /offers/*
-	offersGroup := router.Group("/offers")
-	offersGroup.Use(middleware.AuthMiddleware(jwtSecret))
+	// ---------- AGGREGATOR – защищённые ------------------------------------
+	offers := r.Group("/offers", middleware.AuthMiddleware(jwtSecret))
 	{
-		offersGroup.Any("", proxyKeepPath(agrURL))
-		offersGroup.Any("/*proxyPath", proxyKeepPath(agrURL))
+		offers.Any("", proxyKeepPath(agrURL))
+		offers.Any("/*proxyPath", proxyKeepPath(agrURL))
 	}
 
 	log.Println("Gateway запущен на :8080")
-	if err := router.Run(":8080"); err != nil {
-		log.Fatalf("Не удалось запустить gateway: %v", err)
+	if err := r.Run(":8080"); err != nil {
+		log.Fatalf("не удалось запустить gateway: %v", err)
 	}
 }
 
-// reverseProxy — для маршрутов с *proxyPath
+// ============================= proxy helpers ===============================
+
 func reverseProxy(target string) gin.HandlerFunc {
 	remote, err := url.Parse(target)
 	if err != nil {
-		log.Fatalf("Невалидный адрес сервиса: %v", err)
+		log.Fatalf("невалидный адрес сервиса: %v", err)
 	}
 	proxy := httputil.NewSingleHostReverseProxy(remote)
 
@@ -81,11 +81,10 @@ func reverseProxy(target string) gin.HandlerFunc {
 	}
 }
 
-// reverseProxyPath — для фиксированных путей без wildcard
 func reverseProxyPath(target, path string) gin.HandlerFunc {
 	remote, err := url.Parse(target)
 	if err != nil {
-		log.Fatalf("Невалидный адрес сервиса: %v", err)
+		log.Fatalf("невалидный адрес сервиса: %v", err)
 	}
 	proxy := httputil.NewSingleHostReverseProxy(remote)
 
@@ -95,7 +94,6 @@ func reverseProxyPath(target, path string) gin.HandlerFunc {
 	}
 }
 
-// proxyKeepPath — не переписывает путь, просто проксирует как есть
 func proxyKeepPath(target string) gin.HandlerFunc {
 	remote, err := url.Parse(target)
 	if err != nil {
@@ -103,6 +101,20 @@ func proxyKeepPath(target string) gin.HandlerFunc {
 	}
 	proxy := httputil.NewSingleHostReverseProxy(remote)
 	return func(c *gin.Context) {
+		proxy.ServeHTTP(c.Writer, c.Request)
+	}
+}
+
+// proxyStripPrefix удаляет prefix из пути перед проксированием
+func proxyStripPrefix(target, prefix string) gin.HandlerFunc {
+	remote, err := url.Parse(target)
+	if err != nil {
+		log.Fatalf("invalid proxy url: %v", err)
+	}
+	proxy := httputil.NewSingleHostReverseProxy(remote)
+
+	return func(c *gin.Context) {
+		c.Request.URL.Path = strings.TrimPrefix(c.Request.URL.Path, prefix)
 		proxy.ServeHTTP(c.Writer, c.Request)
 	}
 }

@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -12,6 +13,7 @@ type User struct {
 	ID                    uuid.UUID `json:"id"`
 	Email                 string    `json:"email"`
 	EmailVerified         bool      `json:"email_verified"`
+	IsSuperuser           bool      `json:"is_superuser"` // NEW: флаг суперпользователя
 	VerificationCode      string    `json:"-"`
 	PasswordHash          string    `json:"-"` // не выводится в JSON
 	Name                  string    `json:"name"`
@@ -32,13 +34,13 @@ type Token struct {
 
 // Структура для таблицы components
 type Component struct {
-	ID        int       `db:"id"` // или uuid, если хотите
-	Name      string    `db:"name"`
-	Category  string    `db:"category"`
-	Brand     string    `db:"brand"`
-	Specs     []byte    `db:"specs"` // можно хранить как JSON-сырые данные
-	CreatedAt time.Time `db:"created_at"`
-	UpdatedAt time.Time `db:"updated_at"`
+	ID        int             `db:"id"        json:"id"`
+	Name      string          `db:"name"      json:"name"`
+	Category  string          `db:"category"  json:"category"`
+	Brand     string          `db:"brand"     json:"brand,omitempty"`
+	Specs     json.RawMessage `db:"specs"     json:"specs"` // <-- ключевое
+	CreatedAt time.Time       `db:"created_at" json:"created_at"`
+	UpdatedAt time.Time       `db:"updated_at" json:"updated_at"`
 }
 
 // Это то, что мы получаем в CreateConfigRequest/UpdateConfigRequest

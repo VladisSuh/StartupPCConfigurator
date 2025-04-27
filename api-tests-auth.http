@@ -32,8 +32,8 @@ Content-Type: application/json
 #       "expires_at":   "..."
 #   }
 ################################################################################
-@access_token  = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImtyYXNpbmFfMjAwM0BtYWlsLnJ1IiwiZXhwIjoxNzQ1NzY3OTQ3LCJ1c2VyX2lkIjoiYjAyYmRlNmItOGFjNC00OWRkLThlY2EtNTgzMDA5YWQwYWVlIn0.HBg7LCQA0j6LfBVOMgTM9SdDscnleugeHHiVzxCU8RU
-@refresh_token = SGppWH0uFI3Iz5Y6Hpk3HgTQs4stSF7aR0cd32XK_LulHcJ1OE8Z9Lf_Enm-bBBFy3qR_k-4ePUUZb_JCaWCKQ==
+@access_token  = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImtyYXNpbmFfMjAwM0BtYWlsLnJ1IiwiZXhwIjoxNzQ1ODQ5NDEzLCJ1c2VyX2lkIjoiNDIxNDZlMGUtOGEwZC00Yzg4LWFiZTctYWZiYmE3ZGYxZjQwIn0.BkUkXbYCSR3g0z3bdGEcB_DXp1COGNrZdXP1ut0P9bE
+@refresh_token = 2
 
 ################################################################################
 ### 3. вызов /auth/me (проверяем access‑token)
@@ -113,7 +113,7 @@ GET {{config_host}}/config/components
 # Authorization: Bearer {{access_token}}
 
 ### 11.1 получить компоненты по категории
-GET {{config_host}}/config/components?category=gpu
+GET {{config_host}}/config/components?category=hdd
 Authorization: Bearer {{access_token}}
 
 ### 11.2 поиск компонентов по названию
@@ -124,7 +124,7 @@ Authorization: Bearer {{access_token}}
 ### 12. создание конфигурации
 @config_name = My First PC Build
 
-POST {{config_host}}/config-secure/newconfig
+POST {{config_host}}/config/newconfig
 Content-Type: application/json
 Authorization: Bearer {{access_token}}
 
@@ -176,46 +176,14 @@ Authorization: Bearer {{access_token}}
 
 ################################################################################
 ### 15. получить конфигурации пользователя
-GET {{config_host}}/config-secure/userconf
+GET {{config_host}}/config/userconf
 Authorization: Bearer {{access_token}}
 
 ################################################################################
 ### 16. удалить конфигурацию
-DELETE {{config_host}}/config-secure/newconfig/{{config_id}}
+DELETE {{config_host}}/config/newconfig/{{config_id}}
 Authorization: Bearer {{access_token}}
 
-
-################################################################################
-### 17. генерация совместимых сборок
-POST {{config_host}}/config-secure/generate
-Content-Type: application/json
-Authorization: Bearer {{access_token}}
-
-{
-  "components": [
-    {
-      "category": "CPU",
-      "name": "AMD Ryzen 5 5600X"
-    },
-    {
-      "category": "GPU",
-      "name": "NVIDIA GeForce RTX 3060"
-    }
-  ]
-}
-
-
-################################################################################
-### 18. генерация всех сборок (пустой массив компонентов)
-POST {{config_host}}/config-secure/generate
-Content-Type: application/json
-Authorization: Bearer {{access_token}}
-
-{
-  "components": []
-}
-
-### ↓ в ответе поле configs будет содержать ВСЕ возможные комбинации ################
 
 
 ################################################################################
@@ -295,34 +263,6 @@ GET {{config_host}}/config/usecases
 GET {{config_host}}/config/usecase/office
 # Authorization: Bearer {{access_token}}  (необязательно)
 
-################################################################################
-### 25. низкоуровневая генерация совместимых сборок
-POST {{config_host}}/config/generate
-Content-Type: application/json
-# Authorization: Bearer {{access_token}}  (необязательно)
-
-{
-  "components": [
-    {
-      "category": "CPU",
-      "name": "AMD Ryzen 5 5600X"
-    },
-    {
-      "category": "GPU",
-      "name": "NVIDIA GeForce RTX 3060"
-    }
-  ]
-}
-
-################################################################################
-### 26. низкоуровневая генерация всех совместимых сборок
-POST {{config_host}}/config/generate
-Content-Type: application/json
-# Authorization: Bearer {{access_token}}  (необязательно)
-
-{
-  "components": []
-}
 
 ################################################################################
 ### 27. генерация сборок по сценарию с учётом входных компонентов

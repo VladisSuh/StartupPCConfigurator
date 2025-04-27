@@ -89,9 +89,6 @@ paths:
       tags:
         - Auth
       summary: Информация о текущем пользователе
-      # Если требуется авторизация:
-      # security:
-      #   - BearerAuth: []
       responses:
         '200':
           description: Данные о текущем пользователе
@@ -102,174 +99,59 @@ paths:
         '401':
           description: Не авторизован
 
-
-  /auth/forgot_password:
-    post:
-      tags:
-        - Auth
-      summary: "Запрос на сброс пароля по email"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                email:
-                  type: string
-                  format: email
-      responses:
-        '200':
-          description: "Ссылка на сброс пароля отправлена (или сообщение, что всё ок)"
-        '404':
-          description: "Пользователь не найден (опционально)"
-
-  /auth/reset_password:
-    post:
-      tags:
-        - Auth
-      summary: "Завершение сброса пароля"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                reset_token:
-                  type: string
-                  minLength: 10
-                new_password:
-                  type: string
-                  minLength: 8
-      responses:
-        '200':
-          description: "Пароль успешно сброшен"
-        '401':
-          description: "Токен просрочен/недействителен"
-
-  /auth/verify_email:
-    post:
-      tags:
-        - Auth
-      summary: "Подтверждение email пользователя"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                email:
-                  type: string
-                  format: email
-                verification_code:
-                  type: string
-      responses:
-        '200':
-          description: "Email подтвержден"
-        '400':
-          description: "Неверный код подтверждения"
-        '404':
-          description: "Пользователь не найден"
-
-  # ----------------------------
-  # CONFIGURATOR ENDPOINTS
-  # ----------------------------
-  /config/components:
-    get:
-      tags:
-        - Configurator
-      summary: Список компонентов
-      description: Получение списка компонентов с фильтрацией по категории или поисковому запросу
-      parameters:
-        - in: query
-          name: category
-          schema:
-            type: string
-          description: Фильтр по категории (cpu, gpu, motherboard, ram, storage, cooler, case, soundcard, power_supply)
-        - in: query
-          name: search
-          schema:
-            type: string
-          description: Поиск по названию/артикулу
-      responses:
-        '200':
-          description: Список компонентов
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Component'
-        '401':
-          description: Не авторизован (если требуется)
-
   /config/compatible:
     get:
       tags:
         - Configurator
       summary: Получить список совместимых компонентов
-      description: |
-        Возвращает список компонентов для заданной категории,
-        совместимых с уже выбранными компонентами.
-        Например, если выбран процессор с сокетом LGA1200,
-        возвращает материнские платы, поддерживающие этот сокет.
       parameters:
         - in: query
           name: category
           required: true
           schema:
             type: string
-          description: Категория компонентов, для которых ищутся совместимые варианты ("motherboard", "ram", "cpu").
+            enum: [cpu, gpu, motherboard, ram, hdd, ssd, cooler, case, psu]
+          description: Категория, для которой запрашиваем совместимые компоненты
         - in: query
-          name: cpuSocket
-          required: false
-          schema:
-            type: string
-          description: Сокет выбранного процессора. Используется для фильтрации материнских плат.
-        - in: query
-          name: memoryType
-          required: false
-          schema:
-            type: string
-          description: Тип оперативной памяти (например, "DDR4"). Может применяться для фильтрации материнских плат или модулей оперативной памяти.
-        # Можно добавить дополнительные параметры для других зависимостей (например, поддерживаемые интерфейсы для накопителей)
-      responses:
-        '200':
-          description: Список совместимых компонентов найден
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Component'
-        '400':
-          description: Неверные параметры запроса
-  /config/compatible:
-    get:
-      tags: [Configurator]
-      summary: Получить список совместимых компонентов
-      description: |
-        Возвращает компоненты указанной категории, которые
-        совместимы с уже выбранными деталями сборки.
-      parameters:
-        - in: query
-          name: category
-          required: true
-          schema:
-            type: string
-            enum: [cpu, gpu, motherboard, ram, storage, cooler, case, soundcard, power_supply]
-        - in: query
-          name: cpuSocket
+          name: cpu
           schema:
             type: string
           description: Сокет выбранного CPU (например, AM4)
         - in: query
-          name: memoryType
+          name: ram
           schema:
             type: string
-          description: Тип памяти (DDR4, DDR5)
+          description: Модуль/набор RAM
+        - in: query
+          name: motherboard
+          schema:
+            type: string
+          description: Тип материнской платы
+        - in: query
+          name: ssd
+          schema:
+            type: string
+          description: SSD-накопитель
+        - in: query
+          name: hdd
+          schema:
+            type: string
+          description: HDD-накопитель
+        - in: query
+          name: gpu
+          schema:
+            type: string
+          description: Выбранная видеокарта
+        - in: query
+          name: psu
+          schema:
+            type: string
+          description: Выбранный блок питания
+        - in: query
+          name: case
+          schema:
+            type: string
+          description: Выбранный компьютерный корпус
       responses:
         '200':
           description: Список совместимых компонентов
@@ -281,78 +163,84 @@ paths:
                   $ref: '#/components/schemas/Component'
         '400':
           description: Неверные параметры запроса
-
-  /config/newconfig:
-    post:
-      tags: [Configurator]
-      summary: Создать новую конфигурацию
-      security: [{ bearerAuth: [] }]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateConfigRequest'
-      responses:
-        '201':
-          description: Конфигурация создана
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Configuration'
-        '400': { description: Ошибка валидации }
-        '401': { description: Не авторизован }
-
-  /config/userconf:
+  /config/usecases:
     get:
-      tags: [Configurator]
-      summary: Получить конфигурации пользователя
-      security: [{ bearerAuth: [] }]
+      tags:
+        - Configurator
+      summary: Получить список сценариев сборок
       responses:
         '200':
-          description: Список конфигураций
+          description: Список сценариев
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/Configuration'
-        '401': { description: Не авторизован }
+                  type: string
 
-  /config/newconfig/{configId}:
-    parameters:
-      - in: path
-        name: configId
-        required: true
-        schema:
-          type: string
-        description: ID конфигурации
-    put:
-      tags: [Configurator]
-      summary: Обновить конфигурацию
-      security: [{ bearerAuth: [] }]
+  /config/usecase/{name}:
+    get:
+      tags:
+        - Configurator
+      summary: Получить готовую сборку по сценарию
+      parameters:
+        - in: path
+          name: name
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Сборка для указанного сценария
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  components:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Component'
+        '404':
+          description: Сценарий не найден
+
+  /config/usecase/{name}/generate:
+    post:
+      tags:
+        - Configurator
+      summary: Генерация сборок по сценарию и компонентам
+      parameters:
+        - in: path
+          name: name
+          required: true
+          schema:
+            type: string
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UpdateConfigRequest'
+              type: object
+              properties:
+                components:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/ComponentRef'
       responses:
-        '200': { description: Конфигурация обновлена,
-                 content: { application/json: { schema: { $ref: '#/components/schemas/Configuration' } } } }
-        '400': { description: Ошибка валидации }
-        '401': { description: Не авторизован }
-        '404': { description: Конфигурация не найдена }
-    delete:
-      tags: [Configurator]
-      summary: Удалить конфигурацию
-      security: [{ bearerAuth: [] }]
-      responses:
-        '204': { description: Конфигурация удалена }
-        '401': { description: Не авторизован }
-        '403': { description: Нет прав на удаление }
-        '404': { description: Конфигурация не найдена }
-        
+        '200':
+          description: Сгенерированные сборки
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  configs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Configuration'
+        '400':
+          description: Неверный сценарий или ошибка запроса
+
   /config/newconfig:
     post:
       tags:
@@ -372,7 +260,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Configuration'
         '400':
-          description: Ошибка валидации (неверные данные)
+          description: Ошибка валидации
         '401':
           description: Не авторизован
 
@@ -404,7 +292,6 @@ paths:
           required: true
           schema:
             type: string
-          description: ID конфигурации
       requestBody:
         required: true
         content:
@@ -424,48 +311,44 @@ paths:
           description: Не авторизован
         '404':
           description: Конфигурация не найдена
+
     delete:
       tags:
         - Configurator
       summary: Удалить конфигурацию
-      description: Удаляет конфигурацию (сборку) по указанному идентификатору
       parameters:
         - in: path
           name: configId
           required: true
           schema:
             type: string
-          description: ID конфигурации для удаления
       responses:
         '204':
-          description: Конфигурация успешно удалена (No Content)
+          description: Конфигурация успешно удалена
         '401':
           description: Не авторизован
         '403':
-          description: Пользователь не является владельцем этой конфигурации
+          description: Нет прав на удаление
         '404':
           description: Конфигурация не найдена
 
-  # ----------------------------
-  # AGGREGATOR ENDPOINTS
-  # ----------------------------
   /offers:
     get:
       tags:
         - Aggregator
-      summary: Список предложений (оферт) по конкретному компоненту
+      summary: Список предложений (оферт) по компоненту
       parameters:
         - in: query
           name: componentId
           schema:
             type: string
           required: true
-          description: ID компонента, по которому ищем предложения
+          description: ID компонента
         - in: query
           name: sort
           schema:
             type: string
-          description: Тип сортировки (priceAsc, priceDesc, rating и т.п.)
+          description: Тип сортировки (priceAsc, priceDesc, rating)
       responses:
         '200':
           description: Массив предложений
@@ -474,13 +357,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/OffersResponse'
         '400':
-          description: Ошибка валидации (например, отсутсвует componentId)
+          description: Ошибка валидации
+
   /offers/import/:
     post:
       tags:
         - Aggregator
       summary: Импорт прайс-листа из Excel
-      description: Принимает файл XLSX, парсит его и bulk-upsert’ит цены в таблицы offers и price_history.
       requestBody:
         required: true
         content:
@@ -491,27 +374,16 @@ paths:
                 file:
                   type: string
                   format: binary
-                  description: XLSX-файл прайс-листа
-              required:
-                - file
       responses:
         '204':
           description: Прайс-лист успешно импортирован
         '400':
           description: Некорректный запрос или неверный формат файла
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
         '500':
-          description: Внутренняя ошибка сервера при обработке файла
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+          description: Ошибка сервера
+
 components:
   schemas:
-    # -------- Auth Schemas --------
     RegisterRequest:
       type: object
       properties:
@@ -553,7 +425,6 @@ components:
         accessToken:
           type: string
 
-    # -------- Common User --------
     User:
       type: object
       properties:
@@ -570,7 +441,6 @@ components:
           items:
             type: string
 
-    # -------- Configurator Schemas --------
     Component:
       type: object
       properties:
@@ -639,7 +509,6 @@ components:
         componentId:
           type: string
 
-    # -------- Aggregator Schemas --------
     Offer:
       type: object
       properties:
@@ -665,6 +534,7 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Offer'
+
     ErrorResponse:
       type: object
       properties:
@@ -675,20 +545,3 @@ components:
       required:
         - message
         - code
-    # -------- Notifications (пример, если нужно) --------
-    Notification:
-      type: object
-      properties:
-        id:
-          type: string
-        userId:
-          type: string
-        title:
-          type: string
-        message:
-          type: string
-        isRead:
-          type: boolean
-        createdAt:
-          type: string
-          format: date-time

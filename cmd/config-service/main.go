@@ -69,18 +69,3 @@ func main() {
 	}
 	r.Run(":" + port)
 }
-
-//func initDB() (*sql.DB, error) {
-//	// Пример: чтение DSN из env или конфига
-//	dsn := os.Getenv("DB_DSN")
-//	// Подключение к Postgres (github.com/lib/pq)
-//	db, err := sql.Open("postgres", dsn)
-//	if err != nil {
-//		return nil, err
-//	}
-//	// Проверка соединения
-//	if err := db.Ping(); err != nil {
-//		return nil, err
-//	}
-//	return db, nil
-//}

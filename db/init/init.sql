@@ -6,6 +6,7 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 -- =====================
 
 -- Пользователи
+-- Пользователи
 CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     email TEXT UNIQUE NOT NULL,
@@ -17,8 +18,10 @@ CREATE TABLE IF NOT EXISTS users (
     reset_token TEXT,
     reset_token_expires_at TIMESTAMP,
     verification_code TEXT,
-    email_verified BOOLEAN DEFAULT FALSE
+    email_verified BOOLEAN DEFAULT FALSE,
+    is_superuser BOOLEAN NOT NULL DEFAULT FALSE 
 );
+
 
 -- Компоненты
 CREATE TABLE IF NOT EXISTS components (
