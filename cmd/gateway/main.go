@@ -22,6 +22,7 @@ func main() {
 	authURL := os.Getenv("AUTH_SERVICE_URL")
 	configURL := os.Getenv("CONFIG_SERVICE_URL")
 	agrURL := os.Getenv("AGGREGATOR_SERVICE_URL")
+	notifURL := os.Getenv("NOTIFICATIONS_SERVICE_URL")
 
 	r := gin.Default()
 	r.Use(cors.Default())
@@ -64,6 +65,16 @@ func main() {
 	if err := r.Run(":8080"); err != nil {
 		log.Fatalf("не удалось запустить gateway: %v", err)
 	}
+
+	// ---------- NOTIFICATIONS – защищённые ---------------------------------
+	notifications := r.Group("/notifications", middleware.AuthMiddleware(jwtSecret))
+	{
+		// этот маршрут поймает запрос GET /notifications
+		notifications.Any("", proxyKeepPath(notifURL))
+		// а этот — все вложенные, например /notifications/count и /notifications/{id}/read
+		notifications.Any("/*proxyPath", proxyKeepPath(notifURL))
+	}
+
 }
 
 // ============================= proxy helpers ===============================

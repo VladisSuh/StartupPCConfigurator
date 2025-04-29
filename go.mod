@@ -7,13 +7,16 @@ require (
 	github.com/chromedp/cdproto v0.0.0-20250414052033-3603534576c0
 	github.com/chromedp/chromedp v0.13.6
 	github.com/gin-gonic/gin v1.10.0
+	github.com/go-redis/redis/v8 v8.11.5
 	github.com/streadway/amqp v1.1.0
 	github.com/xuri/excelize/v2 v2.9.0
 )
 
 require (
 	github.com/andybalholm/cascadia v1.3.3 // indirect
+	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/chromedp/sysutil v1.1.0 // indirect
+	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/go-json-experiment/json v0.0.0-20250211171154-1ae217ad3535 // indirect
 	github.com/gobwas/httphead v0.1.0 // indirect
 	github.com/gobwas/pool v0.2.1 // indirect

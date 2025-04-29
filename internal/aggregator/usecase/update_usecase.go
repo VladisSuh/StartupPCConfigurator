@@ -1,9 +1,11 @@
 package usecase
 
 import (
+	_ "StartupPCConfigurator/internal/config/usecase"
 	"context"
 	"log"
 	"strconv"
+	_ "time"
 )
 
 type UpdateUseCase interface {
@@ -63,9 +65,18 @@ func (uc *updateUseCase) ProcessShopUpdate(ctx context.Context, jobID, shopID in
 			uc.logger.Printf("db error insert history: %v", err)
 		}
 
-		// опубликовать событие
-		if err := uc.publisher.PublishPriceChanged(it.ComponentID, shopID, price); err != nil {
-			uc.logger.Printf("publish error: %v", err)
+		// внутри цикла импорта
+		oldPrice, err := uc.repo.GetOfferPrice(ctx, it.ComponentID, shopID)
+		if err != nil {
+			uc.logger.Printf("cannot get old price: %v", err)
+			oldPrice = 0
+		}
+		newPrice := price
+		ComponentID := it.ComponentID
+		if oldPrice != newPrice {
+			if err := uc.publisher.PublishPriceChanged(ComponentID, shopID, newPrice); err != nil {
+				uc.logger.Printf("failed to publish price.changed: %v", err)
+			}
 		}
 	}
 

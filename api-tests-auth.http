@@ -32,7 +32,7 @@ Content-Type: application/json
 #       "expires_at":   "..."
 #   }
 ################################################################################
-@access_token  = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImtyYXNpbmFfMjAwM0BtYWlsLnJ1IiwiZXhwIjoxNzQ1ODQ5NDEzLCJ1c2VyX2lkIjoiNDIxNDZlMGUtOGEwZC00Yzg4LWFiZTctYWZiYmE3ZGYxZjQwIn0.BkUkXbYCSR3g0z3bdGEcB_DXp1COGNrZdXP1ut0P9bE
+@access_token  = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImtyYXNpbmFfMjAwM0BtYWlsLnJ1IiwiZXhwIjoxNzQ2MDIwNDIwLCJ1c2VyX2lkIjoiNzM3YTcxYzctNzgwZS00NTliLWI2OTQtOTUwNTEwYTk3YWNjIn0.tDnaeP-7oquyJV6Nuwby4bHEwzUq8MCN8FSmw6X8sIw
 @refresh_token = 2
 
 ################################################################################
@@ -281,8 +281,8 @@ Content-Type: application/json
 
 ###GET на агрегатор
 GET http://localhost:8080/offers?
-    componentId=1&
-    sort=priceDesc
+    componentId=2&
+    sort=priceAsc
 Authorization: Bearer {{access_token}}
 
 ###################Не работает в REST-тестах
@@ -290,3 +290,7 @@ POST http://localhost:8080/offers/import
 Content-Type: multipart/form-data
 
 file=@./dns_pricelist.xlsx;type=application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+
+
+###Notifications GET на Redis
+GET http://localhost:8080/notifications/unread-count

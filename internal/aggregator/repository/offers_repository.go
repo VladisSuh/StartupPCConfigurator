@@ -232,3 +232,21 @@ ON CONFLICT (component_id, shop_id) DO UPDATE
 
 	return tx.Commit()
 }
+
+func (r *repoImpl) GetOfferPrice(ctx context.Context, compID string, shopID int64) (float64, error) {
+	const q = `
+SELECT price
+  FROM offers
+ WHERE component_id = $1
+   AND shop_id      = $2
+`
+	var price float64
+	err := r.db.QueryRowContext(ctx, q, compID, shopID).Scan(&price)
+	if err == sql.ErrNoRows {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, err
+	}
+	return price, nil
+}

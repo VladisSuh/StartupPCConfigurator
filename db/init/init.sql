@@ -114,6 +114,19 @@ CREATE TABLE IF NOT EXISTS usecases (
     description TEXT
 );
 
+CREATE TABLE IF NOT EXISTS notifications (
+    id          BIGSERIAL PRIMARY KEY,
+    user_id     UUID    NOT NULL,
+    component_id TEXT   NOT NULL,
+    shop_id     INT     NOT NULL,
+    old_price   NUMERIC NOT NULL,
+    new_price   NUMERIC NOT NULL,
+    is_read     BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at  TIMESTAMP NOT NULL DEFAULT NOW()
+    );
+CREATE INDEX ON notifications(user_id, is_read);
+
+
 -- Индекс для быстрого поиска по категории
 CREATE INDEX IF NOT EXISTS idx_components_category
     ON components (category);

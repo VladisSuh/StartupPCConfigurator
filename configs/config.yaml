@@ -382,6 +382,86 @@ paths:
         '500':
           description: Ошибка сервера
 
+  /notifications:
+    get:
+      tags:
+        - Notifications
+      summary: Получить список уведомлений пользователя
+      description: Возвращает все уведомления (с пагинацией)
+      security:
+        - BearerAuth: [ ]
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+          description: Номер страницы
+        - in: query
+          name: pageSize
+          schema:
+            type: integer
+            default: 20
+          description: Размер страницы
+      responses:
+        '200':
+          description: Список уведомлений
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Notification'
+                  total:
+                    type: integer
+                    description: Общее число уведомлений
+                  page:
+                    type: integer
+                  pageSize:
+                    type: integer
+
+  /notifications/unread-count:
+    get:
+      tags:
+        - Notifications
+      summary: Получить количество непрочитанных уведомлений
+      security:
+        - BearerAuth: [ ]
+      responses:
+        '200':
+          description: Количество непрочитанных уведомлений
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                    description: Число непрочитанных уведомлений
+
+  /notifications/{notificationId}/read:
+    post:
+      tags:
+        - Notifications
+      summary: Отметить одно уведомление как прочитанное
+      security:
+        - BearerAuth: [ ]
+      parameters:
+        - in: path
+          name: notificationId
+          required: true
+          schema:
+            type: string
+          description: ID уведомления
+      responses:
+        '204':
+          description: Уведомление успешно отмечено как прочитанное
+        '404':
+          description: Уведомление не найдено
+
 components:
   schemas:
     RegisterRequest:
@@ -545,3 +625,21 @@ components:
       required:
         - message
         - code
+    Notification:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        title:
+          type: string
+        message:
+          type: string
+        isRead:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time

@@ -106,3 +106,14 @@ type UseCase struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 }
+
+type Notification struct {
+	ID          uuid.UUID `db:"id" json:"id"`
+	UserID      uuid.UUID `db:"user_id" json:"userId"`
+	ComponentID string    `db:"component_id" json:"componentId"`
+	ShopID      int64     `db:"shop_id" json:"shopId"`
+	OldPrice    float64   `db:"old_price" json:"oldPrice"`
+	NewPrice    float64   `db:"new_price" json:"newPrice"`
+	IsRead      bool      `db:"is_read" json:"isRead"`
+	CreatedAt   time.Time `db:"created_at" json:"createdAt"`
+}
