@@ -1,0 +1,198 @@
+.card {
+    border-top: 1px solid rgba(255, 255, 255, .2);
+    border-bottom: 1px solid rgba(255, 255, 255, .2);
+    padding: 30px 40px 50px;
+    display: flex;
+    align-items: flex-start;
+    text-align: left;
+}
+
+
+.card__info {
+    flex-shrink: 1;
+    flex-grow: 1;
+    margin-right: 30px;
+    width: 100%;
+}
+
+.card__title {
+    font-size: 16px;
+    line-height: 1.5;
+    margin-bottom: 10px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+
+.card__details {
+    cursor: pointer;
+    padding-top: 15px;
+    color: #6629ff;
+    font-weight: 700;
+}
+
+.card__price {
+    font-size: 16px;
+    font-weight: 700;
+    flex-shrink: 0;
+    margin-right: 30px;
+    padding-top: 12px;
+}
+
+.addButton {
+    padding: 10px 0;
+    background: transparent;
+    color: #88f;
+    /* Фиолетовый текст */
+    border: 1px solid #6629ff;
+    /* margin: 10px 20px; */
+    cursor: pointer;
+    border-radius: 0 !important;
+    font-weight: 500;
+    width: 170px;
+    transition: all 0.2s ease;
+    text-align: center;
+}
+
+.addButton:hover {
+    background: #2c2e41;
+    border-radius: 0%;
+    /* Светло-фиолетовый фон при наведении */
+}
+
+.addButtonSelected {
+    color: #88f;
+    /* Фиолетовый текст */
+    border: 1px solid #ffffff;
+    border-radius: 0%;
+    /* Белая обводка */
+    background: transparent;
+}
+
+.addButtonSelected:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 0%;
+    /* Слегка белый фон при наведении */
+}
+
+.addButton,
+.addButton:hover,
+.addButton:active,
+.addButton:focus {
+    border-radius: 0 !important;
+}
+
+.addButton,
+.addButton:hover,
+.addButtonSelected,
+.addButtonSelected:hover {
+    border-radius: 0 !important;
+}
+
+
+.addButton {
+    border-radius: 0 !important;
+    border-top-left-radius: 0 !important;
+    border-top-right-radius: 0 !important;
+    border-bottom-left-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+}
+
+
+.modalOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modalContent {
+    background-color: white;
+    padding: 20px;
+    border-radius: 8px;
+    max-width: 800px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    position: relative;
+}
+
+.closeButton {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    font-size: 1.5rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Остальные стили остаются такими же как в предыдущем примере */
+.offersList {
+    margin-top: 20px;
+}
+
+.offerItem {
+    padding: 10px;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.offerShop {
+    font-weight: bold;
+    width: 30%;
+}
+
+.offerPrice {
+    width: 20%;
+    text-align: right;
+}
+
+.offerAvailability {
+    width: 20%;
+    text-align: center;
+}
+
+.offerLink {
+    width: 30%;
+    text-align: right;
+    color: #0066cc;
+    text-decoration: none;
+}
+
+.offerLink:hover {
+    text-decoration: underline;
+}
+
+.offersButton {
+    margin-top: 10px;
+    padding: 10px 0;
+    background: transparent;
+    color: rgb(255, 255, 255);
+    cursor: pointer;
+    border-radius: 0 !important;
+    font-weight: 500;
+    width: 170px;
+    transition: all 0.2s ease;
+    text-align: center;
+    background-color: #ee5e30;
+    border: none;
+}
+
+.modalContent {
+    color: black
+}

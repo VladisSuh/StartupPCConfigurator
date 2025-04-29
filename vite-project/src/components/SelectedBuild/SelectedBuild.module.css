@@ -1,0 +1,37 @@
+.buildContainer {
+    flex: 340px 0 0;
+
+}
+
+.title {
+    font-size: 20px;
+
+    margin: 0 12px 12px;
+}
+
+.empty {
+    font-style: italic;
+    color: #777;
+}
+
+
+.summary {
+    background-color: #242630;
+    padding: 10px 10px;
+}
+
+.button {
+    width: 100%;
+    height: 48px;
+    border: 2px solid #766fff;
+    font-weight: 700;
+    font-size: 13px;
+    line-height: 48px;
+    text-align: center;
+    text-transform: uppercase;
+    cursor: pointer;
+    display: block;
+    color: #fff;
+    background-color: #1b1c24;
+    margin-top: 20px;
+}
