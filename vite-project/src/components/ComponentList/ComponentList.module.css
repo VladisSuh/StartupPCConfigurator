@@ -1,0 +1,27 @@
+.container {
+    flex-grow: 1;
+    margin-right: 25px;
+    margin-bottom: auto;
+    background-color: #242630;
+    display: block;
+}
+
+.searchContainer {
+    margin-bottom: 24px;
+}
+
+.searchInput {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 16px;
+}
+
+.controls{
+    margin: 14px 5px;
+}
+
+.checkboxLabel input {
+    margin-right: 18px; /* или любой другой отступ */
+}

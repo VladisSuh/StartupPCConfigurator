@@ -1,0 +1,28 @@
+/* CategoryTabs.module.css */
+.tabsContainer {
+    display: flex;
+    flex-direction: column;
+    margin-right: 25px;
+    margin-bottom: auto;
+    width: 300px;
+    text-align: left;
+}
+
+.tabsItems {
+    font-size: 14px;
+    color: #fff;
+}
+
+.tab {
+    width: 100%;
+    min-height: 120px;
+    padding: 10px 15px;
+    border: 1px solid rgba(255, 255, 255, .1);
+    cursor: pointer;
+}
+
+.tabActive {
+    background: linear-gradient(114.13deg, #242238 29.14%, #6629ff 124.41%);
+    border-color: transparent;
+    transition: all 1s ease;
+}
