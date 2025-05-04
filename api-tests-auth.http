@@ -32,7 +32,7 @@ Content-Type: application/json
 #       "expires_at":   "..."
 #   }
 ################################################################################
-@access_token  = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImtyYXNpbmFfMjAwM0BtYWlsLnJ1IiwiZXhwIjoxNzQ2MDIwNDIwLCJ1c2VyX2lkIjoiNzM3YTcxYzctNzgwZS00NTliLWI2OTQtOTUwNTEwYTk3YWNjIn0.tDnaeP-7oquyJV6Nuwby4bHEwzUq8MCN8FSmw6X8sIw
+@access_token  = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImtyYXNpbmFfMjAwM0BtYWlsLnJ1IiwiZXhwIjoxNzQ2Mjc5MjI2LCJ1c2VyX2lkIjoiNTExY2ZhOTQtYTAzNC00OTAwLTg0MGItZmY4MjFlOWUwMzllIn0.NU5VvsObonASQkok5C9ZWENlCLmTVfu0PpbDueXtiFM
 @refresh_token = 2
 
 ################################################################################
@@ -281,7 +281,7 @@ Content-Type: application/json
 
 ###GET на агрегатор
 GET http://localhost:8080/offers?
-    componentId=2&
+    componentId=1&
     sort=priceAsc
 Authorization: Bearer {{access_token}}
 

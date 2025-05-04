@@ -23,9 +23,29 @@ func main() {
 	configURL := os.Getenv("CONFIG_SERVICE_URL")
 	agrURL := os.Getenv("AGGREGATOR_SERVICE_URL")
 	notifURL := os.Getenv("NOTIFICATIONS_SERVICE_URL")
+	frontendURL := os.Getenv("FRONTEND_URL")
+	if frontendURL == "" {
+		frontendURL = "http://localhost:5173"
+	}
 
 	r := gin.Default()
-	r.Use(cors.Default())
+	// Настраиваем CORS для разработки
+	config := cors.DefaultConfig()
+	config.AllowOrigins = []string{frontendURL}
+	config.AllowMethods = []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}
+	config.AllowHeaders = []string{"Origin", "Content-Type", "Authorization"}
+	r.Use(cors.New(config))
+
+	// ---------- FRONTEND --------------------------------------------------------
+	r.NoRoute(func(c *gin.Context) {
+		// Проксируем все остальные запросы на фронтенд
+		remote, err := url.Parse(frontendURL)
+		if err != nil {
+			log.Fatalf("невалидный адрес фронтенда: %v", err)
+		}
+		proxy := httputil.NewSingleHostReverseProxy(remote)
+		proxy.ServeHTTP(c.Writer, c.Request)
+	})
 
 	// ---------- AUTH --------------------------------------------------------
 	r.Any("/auth/*proxyPath", reverseProxy(authURL))

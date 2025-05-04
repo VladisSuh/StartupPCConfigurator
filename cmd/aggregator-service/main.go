@@ -81,6 +81,12 @@ func main() {
 		}
 	}()
 
+	go func() {
+		if err := rabbitmq.StartImportConsumer(ch, offersUC, logger); err != nil {
+			logger.Fatalf("Import consumer error: %v", err)
+		}
+	}()
+
 	// === 6. Запуск HTTP‑сервера ===
 	r := gin.Default()
 	r.GET("/offers", offersHandler.GetOffers)
