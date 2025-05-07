@@ -81,9 +81,15 @@ func main() {
 		offers.Any("/*proxyPath", proxyKeepPath(agrURL))
 	}
 
-	log.Println("Gateway запущен на :8080")
-	if err := r.Run(":8080"); err != nil {
-		log.Fatalf("не удалось запустить gateway: %v", err)
+	// **НОВЫЙ БЛОК**: /subscriptions → Notifications-service
+	subs := r.Group("/subscriptions", middleware.AuthMiddleware(jwtSecret))
+	{
+		// POST /subscriptions
+		subs.POST("", proxyKeepPath(notifURL))
+		// GET  /subscriptions
+		subs.GET("", proxyKeepPath(notifURL))
+		// DELETE /subscriptions/:componentId
+		subs.DELETE("/:componentId", proxyKeepPath(notifURL))
 	}
 
 	// ---------- NOTIFICATIONS – защищённые ---------------------------------
@@ -93,6 +99,11 @@ func main() {
 		notifications.Any("", proxyKeepPath(notifURL))
 		// а этот — все вложенные, например /notifications/count и /notifications/{id}/read
 		notifications.Any("/*proxyPath", proxyKeepPath(notifURL))
+	}
+
+	log.Println("Gateway запущен на :8080")
+	if err := r.Run(":8080"); err != nil {
+		log.Fatalf("не удалось запустить gateway: %v", err)
 	}
 
 }

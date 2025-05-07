@@ -75,7 +75,7 @@ func connectRabbit(rabbitURL string, logger *log.Logger) (*amqp.Connection, *amq
 			break
 		}
 		logger.Printf("RabbitMQ connection failed, retrying in 3s: %v", err)
-		time.Sleep(3 * time.Second)
+		time.Sleep(5 * time.Second)
 	}
 	if err != nil {
 		logger.Fatalf("failed to connect to RabbitMQ: %v", err)

@@ -461,7 +461,62 @@ paths:
           description: Уведомление успешно отмечено как прочитанное
         '404':
           description: Уведомление не найдено
+  /subscriptions:
+    post:
+      tags: [ Subscriptions ]
+      summary: Подписаться на компонент
+      security:
+        - BearerAuth: [ ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubscribeRequest'
+      responses:
+        '204':
+          description: Подписка создана
+        '400':
+          description: Некорректные данные
+        '401':
+          description: Не авторизован
 
+    get:
+      tags: [ Subscriptions ]
+      summary: Список подписок пользователя
+      security:
+        - BearerAuth: [ ]
+      responses:
+        '200':
+          description: Массив componentId
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string      # componentId
+        '401':
+          description: Не авторизован
+  /subscriptions/{componentId}:
+    delete:
+      tags: [ Subscriptions ]
+      summary: Отписаться от компонента
+      security:
+        - BearerAuth: [ ]
+      parameters:
+        - in: path
+          name: componentId
+          required: true
+          schema:
+            type: string
+          description: ID компонента
+      responses:
+        '204':
+          description: Подписка удалена
+        '401':
+          description: Не авторизован
+        '404':
+          description: Подписка не найдена
 components:
   schemas:
     RegisterRequest:
@@ -643,3 +698,9 @@ components:
         createdAt:
           type: string
           format: date-time
+    SubscribeRequest:
+      type: object
+      properties:
+        componentId:
+          type: string
+      required: [ componentId ]

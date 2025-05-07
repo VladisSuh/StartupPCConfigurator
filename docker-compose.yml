@@ -83,6 +83,7 @@ services:
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
       - REDIS_URL=redis:6379
       - NOTIFICATIONS_PORT=8004
+      - JWT_SECRET=${JWT_SECRET:-secret_key}
     ports:
       - "8004:8004"
     depends_on:

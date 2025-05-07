@@ -17,6 +17,8 @@ type NotificationRepository interface {
 	CreateNotification(ctx context.Context, n domain.Notification) error
 	ListNotifications(ctx context.Context, userID uuid.UUID) ([]domain.Notification, error)
 	MarkAsRead(ctx context.Context, userID, notifID uuid.UUID) error
+	Subscribe(ctx context.Context, userID uuid.UUID, componentID string) error
+	Unsubscribe(ctx context.Context, userID uuid.UUID, componentID string) error
 }
 
 // repoImpl implements NotificationRepository using PostgreSQL
@@ -102,6 +104,22 @@ SET is_read = TRUE
 WHERE id = $1 AND user_id = $2
 `
 	_, err := r.db.ExecContext(ctx, query, notifID, userID)
+	return err
+}
+
+func (r *repoImpl) Subscribe(ctx context.Context, userID uuid.UUID, componentID string) error {
+	_, err := r.db.ExecContext(ctx,
+		`INSERT INTO subscriptions(user_id,component_id) VALUES($1,$2)
+     ON CONFLICT DO NOTHING`,
+		userID, componentID)
+	return err
+}
+
+func (r *repoImpl) Unsubscribe(ctx context.Context, userID uuid.UUID, componentID string) error {
+	_, err := r.db.ExecContext(ctx,
+		`DELETE FROM subscriptions WHERE user_id=$1 AND component_id=$2`,
+		userID, componentID,
+	)
 	return err
 }
 

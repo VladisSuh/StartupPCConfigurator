@@ -32,7 +32,7 @@ Content-Type: application/json
 #       "expires_at":   "..."
 #   }
 ################################################################################
-@access_token  = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImtyYXNpbmFfMjAwM0BtYWlsLnJ1IiwiZXhwIjoxNzQ2Mjc5MjI2LCJ1c2VyX2lkIjoiNTExY2ZhOTQtYTAzNC00OTAwLTg0MGItZmY4MjFlOWUwMzllIn0.NU5VvsObonASQkok5C9ZWENlCLmTVfu0PpbDueXtiFM
+@access_token  = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImZvcm1haWx2bGFkaXNAZ21haWwuY29tIiwiZXhwIjoxNzQ2NzQ4MTI4LCJ1c2VyX2lkIjoiMjVlN2RiZjMtYzkyYS00MmZmLWI2N2ItZmIxNWM4N2Q2MGEyIn0.KubtHBgdVP-7bOiNLwDR8_uokr6xzGgbzvgoluVWs-k
 @refresh_token = 2
 
 ################################################################################
@@ -291,6 +291,15 @@ Content-Type: multipart/form-data
 
 file=@./dns_pricelist.xlsx;type=application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
 
+###Post на создание подписки
+POST http://localhost:8080/subscriptions
+Content-Type: application/json
+Authorization: Bearer {{access_token}}
+
+{
+  "componentId": "5"
+}
 
 ###Notifications GET на Redis
-GET http://localhost:8080/notifications/unread-count
+GET http://localhost:8080/notifications/count
+Authorization: Bearer {{access_token}}

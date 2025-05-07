@@ -24,6 +24,10 @@ type NotificationUseCase interface {
 
 	// Отметить уведомление как прочитанное
 	MarkAsRead(ctx context.Context, userID, notifID uuid.UUID) error
+
+	Subscribe(ctx context.Context, userID uuid.UUID, componentID string) error
+
+	Unsubscribe(ctx context.Context, userID uuid.UUID, componentID string) error
 }
 
 // notificationUseCase реализует NotificationUseCase
@@ -101,4 +105,11 @@ func (uc *notificationUseCase) MarkAsRead(ctx context.Context, userID, notifID u
 		uc.logger.Printf("ResetUnread error: %v", err)
 	}
 	return nil
+}
+
+func (uc *notificationUseCase) Subscribe(ctx context.Context, userID uuid.UUID, componentID string) error {
+	return uc.repo.Subscribe(ctx, userID, componentID)
+}
+func (uc *notificationUseCase) Unsubscribe(ctx context.Context, userID uuid.UUID, componentID string) error {
+	return uc.repo.Unsubscribe(ctx, userID, componentID)
 }

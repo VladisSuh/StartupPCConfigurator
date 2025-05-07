@@ -115,7 +115,7 @@ CREATE TABLE IF NOT EXISTS usecases (
 );
 
 CREATE TABLE IF NOT EXISTS notifications (
-    id          BIGSERIAL PRIMARY KEY,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id     UUID    NOT NULL,
     component_id TEXT   NOT NULL,
     shop_id     INT     NOT NULL,
@@ -126,6 +126,20 @@ CREATE TABLE IF NOT EXISTS notifications (
     );
 CREATE INDEX ON notifications(user_id, is_read);
 
+CREATE TABLE IF NOT EXISTS subscriptions (
+                                             id           SERIAL PRIMARY KEY,
+                                             user_id      UUID    NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    component_id TEXT    NOT NULL,
+    created_at   TIMESTAMP NOT NULL DEFAULT now(),
+    UNIQUE(user_id, component_id)
+    );
+
+-- индекс для быстрого поиска подписчиков по компоненту
+CREATE INDEX idx_subscriptions_by_component
+    ON subscriptions(component_id);
+-- для быстрого поиска всех подписок пользователя
+CREATE INDEX IF NOT EXISTS idx_subscriptions_by_user
+    ON subscriptions (user_id);
 
 -- Индекс для быстрого поиска по категории
 CREATE INDEX IF NOT EXISTS idx_components_category

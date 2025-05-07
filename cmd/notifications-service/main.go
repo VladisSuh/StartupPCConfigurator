@@ -28,7 +28,7 @@ func main() {
 	dbConnStr := os.Getenv("DB_CONN_STR")
 	for i := 0; i < 3; i++ {
 		if dbConnStr == "" {
-			dbConnStr = "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable"
+			dbConnStr = "postgres://postgres:postgres@localhost:5432/postgres_db?sslmode=disable"
 		}
 		log.Println("Postgres подключается, ожидайте ещё 5 секунд...")
 		time.Sleep(5 * time.Second)
@@ -121,6 +121,13 @@ func main() {
 		n.GET("/count", notifHandler.UnreadCount)
 		n.GET("", notifHandler.List)
 		n.POST("/:id/read", notifHandler.MarkRead)
+	}
+
+	subs := r.Group("/subscriptions")
+	subs.Use(middleware.AuthMiddleware(jwtSecret))
+	{
+		subs.POST("", notifHandler.Subscribe)
+		subs.DELETE("/:componentId", notifHandler.Unsubscribe)
 	}
 
 	logger.Printf("Notifications service listening on :%s", httpPort)

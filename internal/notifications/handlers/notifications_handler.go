@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log"
 	"net/http"
 	"time"
 
@@ -23,10 +24,14 @@ func NewHandler(uc usecase.NotificationUseCase) *Handler {
 // UnreadCount обрабатывает GET /notifications/count
 func (h *Handler) UnreadCount(c *gin.Context) {
 	// userId извлекаем из контекста, устанавливается в middleware
-	userIDStr := c.GetString("userId")
-	userID, err := uuid.Parse(userIDStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user ID"})
+	userIDVal, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in context"})
+		return
+	}
+	userID, ok := userIDVal.(uuid.UUID)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user ID type"})
 		return
 	}
 
@@ -41,10 +46,14 @@ func (h *Handler) UnreadCount(c *gin.Context) {
 
 // List обрабатывает GET /notifications
 func (h *Handler) List(c *gin.Context) {
-	userIDStr := c.GetString("userId")
-	userID, err := uuid.Parse(userIDStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user ID"})
+	userIDVal, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in context"})
+		return
+	}
+	userID, ok := userIDVal.(uuid.UUID)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user ID type"})
 		return
 	}
 
@@ -74,10 +83,14 @@ func (h *Handler) List(c *gin.Context) {
 
 // MarkRead обрабатывает POST /notifications/:id/read
 func (h *Handler) MarkRead(c *gin.Context) {
-	userIDStr := c.GetString("userId")
-	userID, err := uuid.Parse(userIDStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user ID"})
+	userIDVal, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in context"})
+		return
+	}
+	userID, ok := userIDVal.(uuid.UUID)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user ID type"})
 		return
 	}
 
@@ -96,4 +109,54 @@ func (h *Handler) MarkRead(c *gin.Context) {
 	}
 
 	c.Status(http.StatusNoContent)
+}
+
+// POST /subscriptions
+func (h *Handler) Subscribe(c *gin.Context) {
+	log.Println(">> incoming Authorization:", c.GetHeader("Authorization"))
+	userIDVal, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in context"})
+		return
+	}
+	var body struct {
+		ComponentID string `json:"componentId"`
+	}
+	if err := c.BindJSON(&body); err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	userID, ok := userIDVal.(uuid.UUID)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user ID type"})
+		return
+	}
+	if err := h.uc.Subscribe(c.Request.Context(), userID, body.ComponentID); err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{
+		"componentId": body.ComponentID,
+		"subscribed":  true,
+	})
+}
+
+// DELETE /subscriptions/:componentId
+func (h *Handler) Unsubscribe(c *gin.Context) {
+	userIDVal, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in context"})
+		return
+	}
+	compID := c.Param("componentId")
+	userID, ok := userIDVal.(uuid.UUID)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user ID type"})
+		return
+	}
+	if err := h.uc.Unsubscribe(c.Request.Context(), userID, compID); err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	c.Status(204)
 }

@@ -250,3 +250,12 @@ SELECT price
 	}
 	return price, nil
 }
+
+func (r *repoImpl) GetShopIDByCode(ctx context.Context, code string) (int64, error) {
+	const q = `SELECT id FROM shops WHERE code = $1`
+	var id int64
+	if err := r.db.QueryRowContext(ctx, q, code).Scan(&id); err != nil {
+		return 0, err
+	}
+	return id, nil
+}
