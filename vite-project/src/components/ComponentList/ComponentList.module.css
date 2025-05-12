@@ -1,9 +1,9 @@
 .container {
-    flex-grow: 1;
     margin-right: 25px;
     margin-bottom: auto;
-    background-color: #242630;
+    background-color: #1b1b1b;
     display: block;
+    width: 60%;
 }
 
 .searchContainer {
@@ -19,7 +19,7 @@
 }
 
 .controls{
-    margin: 14px 5px;
+    margin: 10px 5px;
 }
 
 .checkboxLabel input {

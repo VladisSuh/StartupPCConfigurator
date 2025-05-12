@@ -3,26 +3,61 @@
     display: flex;
     flex-direction: column;
     margin-right: 25px;
-    margin-bottom: auto;
-    width: 300px;
+    /* width: 300px; */
     text-align: left;
-}
-
-.tabsItems {
     font-size: 14px;
     color: #fff;
+    width: 250px;
 }
 
 .tab {
+    position: relative; /* Нужно для абсолютного позиционирования псевдоэлемента */
     width: 100%;
-    min-height: 120px;
+    min-height: 70px;
     padding: 10px 15px;
-    border: 1px solid rgba(255, 255, 255, .1);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     cursor: pointer;
+    display: flex;
+    align-items: center;
+    will-change: auto;
+    background: transparent;
+    color: rgb(158, 158, 158)
 }
 
+/* Активный таб с градиентным фоном и псевдоэлементом */
 .tabActive {
-    background: linear-gradient(114.13deg, #242238 29.14%, #6629ff 124.41%);
+    position: relative; 
+    background: linear-gradient(114.13deg, #00fff200 40.14%,#00fff218 60.14%, #00fff2 134.41%);
+    border-left: none; 
+    border-right: 1px solid #2dce989d;
+    border-top: 1px solid #2dce989d;
+    border-bottom: 1px solid #2dce989d;
+    transition: background 0.5s ease;
+    color: rgb(255, 255, 255)
+}
+
+
+.tab::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 4px;
+    height: 100%;
+    background-color: rgba(0, 251, 255, 0.849);
+    opacity: 0;
+    transform: scaleY(0.95);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.tabActive::before {
+    opacity: 1;
+    transform: scaleY(1);
+}
+
+/* Состояние таба с компонентом */
+.tabWithComponent {
+    background: linear-gradient(114.13deg, #00fff200 40.14%,#00fff20c 60.14%, #00fff233 124.41%);
     border-color: transparent;
-    transition: all 1s ease;
+    border: 1px solid #2dce982a;
 }

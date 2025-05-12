@@ -13,10 +13,9 @@
 }
 
 .modal {
-    background: white;
-    padding: 20px;
+    background: #212124;
+    padding: 30px;
     border-radius: 12px;
-    max-width: 500px;
     position: relative;
 }
 
@@ -28,4 +27,5 @@
     background: none;
     border: none;
     cursor: pointer;
+    color: white;
 }

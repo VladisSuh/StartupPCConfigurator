@@ -15,9 +15,23 @@ type LoginData = {
 const emailPattern = /^[\w.-]+@[a-zA-Z\d.-]+\.[a-zA-Z]{2,}$/;
 
 
-export default function Login({ setOpenComponent }: { setOpenComponent: (component: string) => void }) {
+export default function Login({ setOpenComponent, onClose, message }:
+    {
+        setOpenComponent: (component: string) => void,
+        onClose: () => void,
+        message?: string
+    }) {
 
-    const { register, handleSubmit, formState: { errors, isValid, isDirty }, reset } = useForm<LoginData>()
+    const {
+        register,
+        handleSubmit,
+        formState: { errors, isValid, isDirty },
+        reset,
+        trigger
+    } = useForm<LoginData>({
+        mode: "onChange"
+
+    })
     const [showPassword, setShowPassword] = useState(false);
 
     const [loading, setLoading] = useState(false);
@@ -51,29 +65,11 @@ export default function Login({ setOpenComponent }: { setOpenComponent: (compone
             console.log('responseData', responseData);
 
             if (response.ok) {
-                // Успешная авторизация
-                /* const result = responseData as {
-                    user: {
-                        id: string;
-                        email: string;
-                        name: string;
-                        roles: string[];
-                    };
-                    accessToken: string;
-                }; */
+
                 console.log('Login successful:', responseData);
-                login(responseData.token.access_token); // Сохраняем токен в контексте
-
-                /* setSuccessMessage(`Добро пожаловать, ${result.user.name}!`); */
-
-                setSuccessMessage(`Добро пожаловать!`);
-
-                // Сохраняем токен (пример)
-                //localStorage.setItem('accessToken', result.accessToken);
-
-                // Перенаправляем пользователя (пример)
-                // navigate('/dashboard');
-
+                login(responseData.token.access_token);
+                onClose()
+                //setSuccessMessage(`Добро пожаловать!`);
                 reset();
             } else if (response.status === 401) {
                 setErrorMessage("Неверный email или пароль");
@@ -90,26 +86,46 @@ export default function Login({ setOpenComponent }: { setOpenComponent: (compone
         }
     };
 
+    const handleBlur = (fieldName: keyof LoginData) => {
+        trigger(fieldName);
+    };
+
     return (
         <form onSubmit={handleSubmit(onSubmit)} className={classNames(styles.form)}>
+            {message && <div className={styles.message}>{message}</div>}
+
             <h2 className={styles.formLabel}>Авторизация</h2>
 
+
             <label>Email</label>
-            <input {...register("email", { required: true, pattern: emailPattern })} />
-            {errors.email?.type === "required" && (<p role="alert">Email is required</p>)}
-            {errors.email?.type === "pattern" && (<p role="alert">Invalid email address</p>)}
+            <input
+                {...register("email", {
+                    required: "Email обязателен",
+                    pattern: {
+                        value: emailPattern,
+                        message: "Неверный формат email"
+                    }
+                })}
+                onBlur={() => handleBlur("email")}
+                className={errors.email ? styles.errorInput : ''}
+            />
+            {errors.email && (
+                <p role="alert" className={styles.errorMessage}>
+                    {errors.email.message}
+                </p>
+            )}
+
 
             <label>Пароль</label>
             <div className={styles.passwordInputContainer}>
                 <input
                     type={showPassword ? "text" : "password"}
-                    {...register("password", { required: true, maxLength: 20 })}
-                    className={styles.passwordInput}
+                    {...register("password", {
+                        required: "Пароль обязателен",
+                    })}
+                    onBlur={() => handleBlur("password")}
+                    className={`${styles.passwordInput} ${errors.password ? styles.errorInput : ''}`}
                 />
-                {errors.password?.type === "required" && (
-                    <p role="alert" className={styles.errorMessage}>Обязательное поле</p>
-                )}
-
                 <button
                     type="button"
                     className={styles.showPasswordButton}
@@ -122,14 +138,17 @@ export default function Login({ setOpenComponent }: { setOpenComponent: (compone
                     />
                 </button>
             </div>
-
-            {errors.password?.type === "required" && (<p role="alert">Password is required</p>)}
-            {/* {errors.password?.type === "required" && (<p role="alert">Password is required</p>)} */}
+            {errors.password && (
+                <p role="alert" className={styles.errorMessage}>
+                    {errors.password.message}
+                </p>
+            )}
 
 
             <button
                 type="submit"
                 disabled={loading || !isValid || !isDirty}
+                className={styles.submitButton}
             >
                 {loading ? "Загрузка..." : "Войти"}
             </button>
