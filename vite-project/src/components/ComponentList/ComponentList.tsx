@@ -27,10 +27,10 @@ const ComponentList = ({
 
                 const all = await fetchAllComponents(selectedCategory);
                 setAllComponents(all);
+                const compatible = await fetchCompatibleComponents(selectedCategory, selectedComponents)
 
-                const needsCompatibilityCheck = selectedCategory === 'cpu' || selectedCategory === 'ram';
+                setCompatibleComponents(compatible)
 
-                
             } catch (err) {
                 setError(err instanceof Error ? err.message : 'Неизвестная ошибка');
             } finally {
@@ -92,14 +92,14 @@ export default ComponentList;
 
 
 const fetchAllComponents = async (category: string) => {
-    let url = `http://localhost:8080/config/components?category=${encodeURIComponent(category)}`;
+    let url = `http://localhost:8080/config/compatible?category=${encodeURIComponent(category)}`;
 
 
     const response = await fetch(url);
 
     let d = await response.json()
 
-    console.log('Response:', d); // Debugging line
+    console.log('Response fetchAllComponents:', d); // Debugging line
 
     if (!response.ok) {
         throw new Error('Ошибка загрузки компонентов');
@@ -107,22 +107,31 @@ const fetchAllComponents = async (category: string) => {
     return d;
 };
 
-const fetchCompatibleComponents = async (category: string, selectedCpu: Component | null, selectedRam: Component | null) => {
+const fetchCompatibleComponents = async (
+    category: string,
+    selectedComponents: Record<string, Component | null>
+) => {
     let url = `http://localhost:8080/config/compatible?category=${encodeURIComponent(category)}`;
 
-    const cpuSocket = selectedCpu?.specs?.socket;
-    const memoryType = selectedRam?.specs?.ram_type;
+    Object.entries(selectedComponents).forEach(([category, component]) => {
+        if (component !== null) {
+            if (category=='cpu'){
+                url += `&${category}=${encodeURIComponent(component.specs.socket)}`
+            }else{
+                url += `&${category}=${encodeURIComponent(component.name)}`
+            }
+            
+        }
+    });
 
-    if (cpuSocket) {
-        url += `&cpuSocket=${encodeURIComponent(cpuSocket)}`;
-    }
-    if (memoryType) {
-        url += `&memoryType=${encodeURIComponent(memoryType)}`;
-    }
+    console.log('url', url)
 
     const response = await fetch(url);
+    let d = await response.json()
+
+    console.log('Response fetchCompatibleComponents:', d);
     if (!response.ok) {
         throw new Error('Ошибка загрузки совместимых компонентов');
     }
-    return await response.json();
+    return d;
 };
