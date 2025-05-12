@@ -27,9 +27,18 @@ const passwordPattern = /^[A-Za-z\d!@#$%^&*()_+{}\[\]:;'"\\|,.<>\/?~`-]{8,}$/;
 
 const API_URL = "http://localhost:8080/auth/register";
 
-export default function Register({ setOpenComponent }: { setOpenComponent: (component: string) => void }) {
+export default function Register({ setOpenComponent, onClose }: { setOpenComponent: (component: string) => void, onClose: () => void }) {
 
-    const { register, handleSubmit, formState: { errors, isValid, isDirty }, reset } = useForm<RegisterData>()
+    const {
+        register,
+        handleSubmit,
+        formState: { errors, isValid, isDirty },
+        reset,
+        trigger
+    } = useForm<RegisterData>({
+        mode: "onChange"
+    })
+
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -53,7 +62,7 @@ export default function Register({ setOpenComponent }: { setOpenComponent: (comp
 
             if (response.ok) {
                 const result: RegisterResponse = await response.json();
-                setSuccessMessage(`Регистрация успешна! Добро пожаловать, ${result.user.name}`);
+                setSuccessMessage(`Регистрация успешна! Теперь вы можете войти в аккаунт.`);
                 reset();
             } else if (response.status === 400) {
                 setErrorMessage("Ошибка валидации. Проверьте введенные данные.");
@@ -69,49 +78,73 @@ export default function Register({ setOpenComponent }: { setOpenComponent: (comp
         }
     };
 
+    const handleBlur = (fieldName: keyof RegisterData) => {
+        trigger(fieldName);
+    };
+
 
     return (
         <form onSubmit={handleSubmit(onSubmit)} className={classNames(styles.form)}>
             <h2 className={styles.formLabel}>Регистрация</h2>
 
-            <label>Имя</label>
-            <input {...register("name", { required: true, maxLength: 20 })} />
-            {errors.name?.type === "required" && (
-                <p role="alert">Обязательное поле</p>
+            <label className={styles.inputLabel} >Имя</label>
+            <input {...register("name",
+                {
+                    required: "Обязательное поле",
+                    maxLength: {
+                        value: 20,
+                        message: "Максимум 20 символов"
+                    },
+                })}
+                onBlur={() => handleBlur("name")}
+                className={errors.email ? styles.errorInput : ''}
+            />
+            {errors.name && (
+                <p role="alert" className={styles.errorMessage}>
+                    {errors.name.message}
+                </p>
             )}
 
-            <label>Email</label>
-            <input {...register("email", { required: true, pattern: emailPattern })} />
-            {errors.email?.type === "required" && (<p role="alert">Обязательное поле</p>)}
-            {errors.email?.type === "pattern" && (<p role="alert">Неверный формат email</p>)}
+            <label className={styles.inputLabel}>Email</label>
+            <input
+                {...register("email", {
+                    required: "Обязательное поле",
+                    pattern: {
+                        value: emailPattern,
+                        message: "Неверный формат email"
+                    }
+                })}
+                onBlur={() => handleBlur("email")}
+                className={errors.email ? styles.errorInput : ''}
+            />
+            {errors.email && (
+                <p role="alert" className={styles.errorMessage}>
+                    {errors.email.message}
+                </p>
+            )}
 
-            <label>Пароль</label>
+            <label className={styles.inputLabel}>Пароль</label>
             <div className={styles.passwordInputContainer}>
                 <input
                     type={showPassword ? "text" : "password"}
                     {...register("password", {
-                        required: true,
-                        minLength: 8,
-                        maxLength: 20,
-                        pattern: passwordPattern
+                        required: "Обязательное поле",
+                        minLength: {
+                            value: 8,
+                            message: "Минимум 8 символов"
+                        },
+                        maxLength: {
+                            value: 20,
+                            message: "Максимум 20 символов"
+                        },
+                        pattern: {
+                            value: passwordPattern,
+                            message: "Пароль должен содержать только латинские буквы, цифры и спецсимволы"
+                        }
                     })}
-                    className={styles.passwordInput}
+                    onBlur={() => handleBlur("password")}
+                    className={`${styles.passwordInput} ${errors.password ? styles.errorInput : ''}`}
                 />
-                {errors.password?.type === "required" && (
-                    <p role="alert" className={styles.errorMessage}>Обязательное поле</p>
-                )}
-                {errors.password?.type === "minLength" && (
-                    <p role="alert" className={styles.errorMessage}>Минимум 8 символов</p>
-                )}
-                {errors.password?.type === "maxLength" && (
-                    <p role="alert" className={styles.errorMessage}>Максимум 20 символов</p>
-                )}
-                {errors.password?.type === "pattern" && (
-                    <p role="alert" className={styles.errorMessage}>
-                        Пароль должен содержать только латинские буквы, цифры и спецсимволы
-                    </p>
-                )}
-
                 <button
                     type="button"
                     className={styles.showPasswordButton}
@@ -124,25 +157,32 @@ export default function Register({ setOpenComponent }: { setOpenComponent: (comp
                     />
                 </button>
             </div>
+            {errors.password && (
+                <div className={styles.errorMessage}>
+                    {errors.password.message}
+                </div>
+            )}
+
 
 
             <button
                 type="submit"
-                disabled={loading || !isDirty}
+                disabled={loading || !isDirty || !isValid}
+                className={styles.submitButton}
             >
                 {loading ? "Загрузка..." : "Зарегистрироваться"}
             </button>
             {errorMessage && <p className={styles.error}>{errorMessage}</p>}
             {successMessage && (
                 <div className={styles.success}>
-                    <p>
-                        {successMessage}
+                    <p className={styles.successMessage}>
+                        Регистрация успешна! Теперь вы можете
                         <span
                             onClick={() => setOpenComponent('login')}
                             className={styles.loginLink}
                         >
-                            {' '} Войти
-                        </span>
+                            войти в аккаунт
+                        </span>.
                     </p>
                 </div>
             )}

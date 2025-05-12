@@ -6,7 +6,6 @@
     max-width: 400px;
     margin: 0 auto;
     padding: 20px;
-    color: black;
     /* box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); */
 }
 
@@ -23,27 +22,31 @@ label {
 input {
     padding: 10px;
     margin-bottom: 10px;
-    border: 1px solid #ccc;
+    border: 1px solid #2b2b2b;
     border-radius: 4px;
     font-size: 14px;
     outline: none;
 }
 
 input:focus {
-    border-color: #007bff;
-    box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
+    border: 1px solid #00fff29d;
+    box-shadow:
+        inset 0 0 10px rgba(0, 0, 0, 0.151),
+        0 0 10px rgba(55, 255, 245, 0.6);
 }
 
 
 
 /* Базовые стили кнопки */
-button[type="submit"] {
+.submitButton {
     width: 100%;
     padding: 12px 20px;
-    background-color: #4CAF50;
-    /* Зеленый цвет */
+    /* background-color: rgb(153, 42, 243); */
+    background-color: rgba(0, 0, 0, 0.137);
+    box-shadow:
+        inset 0 0 10px rgba(162, 48, 255, 0.712);
+    border: 2px solid rgb(167, 60, 255);
     color: white;
-    border: none;
     border-radius: 4px;
     font-size: 16px;
     font-weight: 500;
@@ -54,24 +57,24 @@ button[type="submit"] {
     align-items: center;
     justify-content: center;
     gap: 8px;
-    /* Для иконки загрузки, если будет добавлена */
+        transition: box-shadow 0.5s cubic-bezier(0.16, 0.79, 0.32, 1.07);
+
 }
 
-/* Состояние наведения */
-button[type="submit"]:not(:disabled):hover {
-    background-color: #45a049;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+.submitButton:not(:disabled):hover {
+    box-shadow:
+        inset 0 0 20px rgba(167, 60, 255, 0.89);
 }
 
-/* Состояние фокуса */
-button[type="submit"]:focus {
+.submitButton:focus {
     outline: none;
-    box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.3);
+    box-shadow: 0 0 0 3px rgba(94, 76, 175, 0.3);
 }
 
-/* Отключенное состояние (во время загрузки) */
-button[type="submit"]:disabled {
-    background-color: #a5d6a7;
+.submitButton:disabled {
+    color: rgb(99, 99, 99);
+    box-shadow:
+        inset 0 0 10px rgba(96, 19, 158, 0.623);
     cursor: not-allowed;
     opacity: 0.8;
 }
@@ -83,6 +86,7 @@ button[type="submit"]:disabled {
 
 .passwordInput {
     min-width: 260px;
+    color: white;
 }
 
 
@@ -95,7 +99,7 @@ button[type="submit"]:disabled {
     width: 100%;
     padding: 10px 40px 10px 15px;
     /* Добавляем отступ справа для иконки */
-    border: 1px solid #ccc;
+    /* border: 1px solid #ccc; */
     border-radius: 4px;
     font-size: 16px;
 }
@@ -114,6 +118,8 @@ button[type="submit"]:disabled {
 .eyeIcon {
     width: 20px;
     height: 20px;
+    margin-bottom: 7px;
+    filter: brightness(0) invert(1);
 }
 
 
@@ -129,22 +135,38 @@ button[type="submit"]:disabled {
 }
 
 .success {
-    color: #2e7d32;
-    background-color: #edf7ed;
+    color: #00fff29d;
     padding: 12px;
     border-radius: 4px;
     margin-top: 16px;
-    border-left: 4px solid #2e7d32;
-    font-size: 14px;
+    border-left: 4px solid #00fff29d;
+    font-size: 16px;
 }
 
 .loginLink {
     /* color: rgb(0, 0, 126); */
-    text-decoration: underline;
+    text-decoration: underline rgba(167, 60, 255, 0.89);
     cursor: pointer;
     margin-left: 0.5rem;
 }
 
-/* .loginLink:hover {
-    color: darkblue;
-} */
+.errorInput {
+    border-color: #ff7a45;
+    box-shadow: 0 0 5px #f8672ec9;
+}
+
+
+.errorMessage {
+    color: #ff7a45;
+    font-size: 12px;
+    margin-top: 0;
+}
+
+.message {
+  color: white; 
+  border-left: 4px solid rgb(167, 60, 255);
+  padding: 10px 12px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  line-height: 1.4;
+}

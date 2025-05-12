@@ -1,0 +1,42 @@
+/* Остальные стили остаются такими же как в предыдущем примере */
+.offersList {
+    margin-top: 20px;
+}
+
+.offerItem {
+    padding: 10px;
+    border-bottom: 1px solid #6b6b6b;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.offerShop {
+    width: 40%;
+}
+
+.offerPrice {
+    width: 20%;
+    text-align: right;
+    margin: 0 40px 0 10px;
+    font-weight: bold;
+}
+
+.offerAvailability {
+    width: 130px;
+    text-align: center;
+
+}
+
+.offerLink {
+    width: 30%;
+    margin-left: 10px;
+    text-align: right;
+    color: #8e2aff;
+    text-decoration: none;
+}
+
+.offerLink:hover {
+    text-decoration: underline;
+}
+

@@ -2,11 +2,10 @@
 .form {
     display: flex;
     flex-direction: column;
-    min-width: 300px;
-    max-width: 400px;
+    
+    width: 350px;
     margin: 0 auto;
     padding: 20px;
-    color: black;
     /* box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); */
 }
 
@@ -16,38 +15,23 @@ label {
     text-align: left;
 }
 
-label::after {
+.inputLabel::after {
     content: " *";
-    color: #970000;
+    color: rgb(153, 42, 243);
 }
 
 input {
     padding: 10px;
+    background-color: #191a1b ;
     margin-bottom: 10px;
-    border: 1px solid #ccc;
+    border: 1px solid #2b2b2b;
     border-radius: 4px;
     font-size: 14px;
     outline: none;
-}
-
-input:focus {
-    border-color: #007bff;
-    box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
-}
-
-
-input[type="submit"] {
-    background-color: #007bff;
     color: white;
-    border: none;
-    padding: 10px;
-    cursor: pointer;
-    transition: background-color 0.3s ease;
 }
 
-input[type="submit"]:hover {
-    background-color: #0056b3;
-}
+
 
 .showPasswordIcon {
     width: 20px;
@@ -70,8 +54,7 @@ input[type="submit"]:hover {
 .passwordInput {
     width: 100%;
     padding: 10px 40px 10px 15px;
-    /* Добавляем отступ справа для иконки */
-    border: 1px solid #ccc;
+    border: 1px solid #2b2b2b;
     border-radius: 4px;
     font-size: 16px;
 }
@@ -90,6 +73,8 @@ input[type="submit"]:hover {
 .eyeIcon {
     width: 20px;
     height: 20px;
+    filter: brightness(0) invert(1);
+    margin-bottom: 7px;
 }
 
 .errorMessage {
@@ -99,13 +84,15 @@ input[type="submit"]:hover {
 }
 
 /* Базовые стили кнопки */
-button[type="submit"] {
+.submitButton {
     width: 100%;
     padding: 12px 20px;
-    background-color: #093d81;
-    /* Зеленый цвет */
+    /* background-color: rgb(153, 42, 243); */
+    background-color: rgba(0, 0, 0, 0.137);
+    box-shadow:
+        inset 0 0 10px rgba(162, 48, 255, 0.712);
+    border: 2px solid rgb(167, 60, 255);
     color: white;
-    border: none;
     border-radius: 4px;
     font-size: 16px;
     font-weight: 500;
@@ -116,24 +103,22 @@ button[type="submit"] {
     align-items: center;
     justify-content: center;
     gap: 8px;
-    /* Для иконки загрузки, если будет добавлена */
 }
 
-/* Состояние наведения */
-button[type="submit"]:not(:disabled):hover {
-    background-color: #01003b;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+.submitButton:not(:disabled):hover {
+    box-shadow:
+        inset 0 0 20px rgba(167, 60, 255, 0.89);
 }
 
-/* Состояние фокуса */
-button[type="submit"]:focus {
+.submitButton:focus {
     outline: none;
     box-shadow: 0 0 0 3px rgba(94, 76, 175, 0.3);
 }
 
-/* Отключенное состояние (во время загрузки) */
-button[type="submit"]:disabled {
-    background-color: #634eb1;
+.submitButton:disabled {
+    color: rgb(99, 99, 99);
+    box-shadow:
+        inset 0 0 10px rgba(96, 19, 158, 0.623);
     cursor: not-allowed;
     opacity: 0.8;
 }
@@ -150,18 +135,40 @@ button[type="submit"]:disabled {
 }
 
 .success {
-    color: #2e7d32;
-    background-color: #edf7ed;
+    color: white;
     padding: 12px;
     border-radius: 4px;
     margin-top: 16px;
-    border-left: 4px solid #2e7d32;
-    font-size: 14px;
+    border-left: 4px solid #53ff5b;
+    font-size: 16px;
 }
 
 .loginLink {
     /* color: rgb(0, 0, 126); */
-    text-decoration: underline;
+    /* text-decoration: underline #7aff81; */
+    color: #00fff2;
     cursor: pointer;
     margin-left: 0.5rem;
+    transition: all 0.3s ease;
+}
+
+.loginLink:hover {
+    color: #00ccff;
+}
+
+
+.errorInput {
+    border-color: #ff7a45;
+    box-shadow: 0 0 5px #f8672ec9;
+}
+
+
+.errorMessage {
+    color: #ff7a45;
+    font-size: 12px;
+    margin-top: 0;
+}
+
+.successMessage{
+    margin: 0;
 }

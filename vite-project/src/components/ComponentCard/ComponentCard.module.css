@@ -3,16 +3,14 @@
     border-bottom: 1px solid rgba(255, 255, 255, .2);
     padding: 30px 40px 50px;
     display: flex;
-    align-items: flex-start;
+    justify-content: space-between;
     text-align: left;
 }
 
 
 .card__info {
-    flex-shrink: 1;
-    flex-grow: 1;
     margin-right: 30px;
-    width: 100%;
+    width: 30%;
 }
 
 .card__title {
@@ -27,7 +25,7 @@
 .card__details {
     cursor: pointer;
     padding-top: 15px;
-    color: #6629ff;
+    color: rgb(169, 75, 247);
     font-weight: 700;
 }
 
@@ -35,33 +33,36 @@
     font-size: 16px;
     font-weight: 700;
     flex-shrink: 0;
-    margin-right: 30px;
+    margin: 0 10px;
     padding-top: 12px;
+    width: 200px
 }
 
 .addButton {
     padding: 10px 0;
-    background: transparent;
-    color: #88f;
-    /* Фиолетовый текст */
-    border: 1px solid #6629ff;
-    /* margin: 10px 20px; */
+    background: rgba(0, 0, 0, 0.226);
+    color: #f5fffe;
+    border: 2px solid #00fff29d;
     cursor: pointer;
     border-radius: 0 !important;
     font-weight: 500;
-    width: 170px;
-    transition: all 0.2s ease;
+    width: 100%;
     text-align: center;
+    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.151);
+    letter-spacing: 0.8px ;
+    /* Только для box-shadow с плавным эффектом */
+    transition: box-shadow 0.5s cubic-bezier(0.16, 0.79, 0.32, 1.07);
 }
 
 .addButton:hover {
-    background: #2c2e41;
-    border-radius: 0%;
-    /* Светло-фиолетовый фон при наведении */
+    /* Сохраняем inset-тень и добавляем внешнюю */
+    box-shadow:
+        inset 0 0 10px rgba(0, 0, 0, 0.151),
+        0 0 10px rgba(55, 255, 245, 0.6);
 }
 
 .addButtonSelected {
-    color: #88f;
+    color: rgb(255, 255, 255);
     /* Фиолетовый текст */
     border: 1px solid #ffffff;
     border-radius: 0%;
@@ -70,8 +71,10 @@
 }
 
 .addButtonSelected:hover {
-    background: rgba(255, 255, 255, 0.1);
     border-radius: 0%;
+    box-shadow:
+        inset 0 0 10px rgba(0, 0, 0, 0.151),
+        0 0 10px rgba(255, 255, 255, 0.6);
     /* Слегка белый фон при наведении */
 }
 
@@ -113,14 +116,14 @@
 }
 
 .modalContent {
-    background-color: white;
-    padding: 20px;
+    background-color: #212124;
+    color: #ffffff;
+    /* padding: 20px; */
     border-radius: 8px;
-    max-width: 800px;
-    width: 90%;
     max-height: 80vh;
     overflow-y: auto;
     position: relative;
+    font-size: 16px;
 }
 
 .closeButton {
@@ -139,60 +142,39 @@
     justify-content: center;
 }
 
-/* Остальные стили остаются такими же как в предыдущем примере */
-.offersList {
-    margin-top: 20px;
-}
-
-.offerItem {
-    padding: 10px;
-    border-bottom: 1px solid #eee;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-
-.offerShop {
-    font-weight: bold;
-    width: 30%;
-}
-
-.offerPrice {
-    width: 20%;
-    text-align: right;
-}
-
-.offerAvailability {
-    width: 20%;
-    text-align: center;
-}
-
-.offerLink {
-    width: 30%;
-    text-align: right;
-    color: #0066cc;
-    text-decoration: none;
-}
-
-.offerLink:hover {
-    text-decoration: underline;
-}
 
 .offersButton {
     margin-top: 10px;
     padding: 10px 0;
-    background: transparent;
+    background: rgba(0, 0, 0, 0.226);
     color: rgb(255, 255, 255);
     cursor: pointer;
     border-radius: 0 !important;
     font-weight: 500;
-    width: 170px;
     transition: all 0.2s ease;
     text-align: center;
-    background-color: #ee5e30;
-    border: none;
+    /* background-color: #16003085; */
+    box-shadow:
+        inset 0 0 10px rgba(155, 33, 255, 0.623);
+    border: 1px solid rgb(153, 42, 243);
+    width: 100%;
+    letter-spacing: 0.8px ;
 }
 
-.modalContent {
-    color: black
+.offersButton:hover {
+    box-shadow:
+        inset 0 0 30px rgba(159, 42, 255, 0.753);
+}
+
+.modalTitle {
+    margin-bottom: 30px;
+}
+
+.card__actions {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    width: 20%
 }

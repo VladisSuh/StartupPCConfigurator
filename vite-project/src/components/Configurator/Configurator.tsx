@@ -21,10 +21,10 @@ const Configurator = () => {
 
     return (
         <div className={styles.container}>
-            <div className={styles.sidebar}>
-                <CategoryTabs onSelect={setSelectedCategory} />
-            </div>
-
+            <CategoryTabs
+                onSelect={setSelectedCategory}
+                selectedComponents={selectedComponents}
+            />
 
             <ComponentList
                 selectedCategory={selectedCategory}
@@ -32,10 +32,10 @@ const Configurator = () => {
                 setSelectedComponents={setSelectedComponents}
             />
 
-
-
-            <SelectedBuild selectedComponents={selectedComponents} setSelectedComponents={setSelectedComponents} />
-
+            <SelectedBuild
+                selectedComponents={selectedComponents}
+                setSelectedComponents={setSelectedComponents}
+            />
         </div>
     );
 }

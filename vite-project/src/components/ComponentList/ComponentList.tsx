@@ -30,30 +30,7 @@ const ComponentList = ({
 
                 const needsCompatibilityCheck = selectedCategory === 'cpu' || selectedCategory === 'ram';
 
-                if (needsCompatibilityCheck) {
-                    if (selectedCategory === 'cpu') {
-
-                        const motherboardSelected = selectedComponents.motherboard;
-
-                        if (motherboardSelected) {
-                            const compatible = await fetchCompatibleComponents(selectedCategory, null, selectedComponents.ram);
-                            setCompatibleComponents(compatible);
-                        } else {
-                            setCompatibleComponents(all);
-                        }
-                    } else if (selectedCategory === 'ram') {
-                        const motherboardSelected = selectedComponents.motherboard;
-
-                        if (motherboardSelected) {
-                            const compatible = await fetchCompatibleComponents(selectedCategory, selectedComponents.cpu, null);
-                            setCompatibleComponents(compatible);
-                        } else {
-                            setCompatibleComponents(all);
-                        }
-                    }
-                } else {
-                    setCompatibleComponents(all);
-                }
+                
             } catch (err) {
                 setError(err instanceof Error ? err.message : 'Неизвестная ошибка');
             } finally {
@@ -68,15 +45,6 @@ const ComponentList = ({
 
     return (
         <div className={styles.container}>
-            {/* <div className={styles.searchContainer}>
-                <input
-                    type="text"
-                    placeholder="Поиск по названию или артикулу"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className={styles.searchInput}
-                />
-            </div> */}
 
             <div className={styles.controls}>
                 <label className={styles.checkboxLabel}>
