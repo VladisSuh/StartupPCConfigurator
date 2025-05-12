@@ -101,6 +101,7 @@ func main() {
 
 	// === 7. Запуск HTTP‑сервера ===
 	r := gin.Default()
+	r.GET("/offers/min", offersHandler.GetMinPrice)
 	r.GET("/offers", offersHandler.GetOffers)
 	r.POST("/offers/import", offersHandler.UploadPriceList)
 

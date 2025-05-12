@@ -20,6 +20,22 @@ func NewOffersHandler(uc usecase.OffersUseCase) *OffersHandler {
 	}
 }
 
+func (h *OffersHandler) GetMinPrice(c *gin.Context) {
+	componentID := c.Query("componentId")
+
+	minPrice, currency, err := h.usecase.GetMinPrice(c.Request.Context(), componentID)
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(200, gin.H{
+		"componentId": componentID,
+		"minPrice":    minPrice,
+		"currency":    currency,
+		"note":        "Цены начинаются от",
+	})
+}
+
 // GetOffers обрабатывает GET /offers?componentId=xxx&sort=priceAsc
 func (h *OffersHandler) GetOffers(c *gin.Context) {
 	componentID := c.Query("componentId")

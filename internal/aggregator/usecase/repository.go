@@ -18,4 +18,5 @@ type Repository interface {
 	UpdateJobStatus(ctx context.Context, jobID int64, status string, message interface{}) error
 	BulkUpsertOffers(ctx context.Context, recs []ImportRecord) error
 	GetOfferPrice(ctx context.Context, compID string, shopID int64) (float64, error)
+	GetMinPrice(ctx context.Context, componentID string) (float64, string, error)
 }

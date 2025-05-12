@@ -16,6 +16,7 @@ type OffersRepository interface {
 	FetchOffers(ctx context.Context, filter domain.OffersFilter) ([]domain.Offer, error)
 
 	GetOfferPrice(ctx context.Context, componentID string, shopID int64) (float64, error)
+	GetMinPrice(ctx context.Context, componentID string) (float64, string, error)
 	UpsertOffer(ctx context.Context, componentID string, shopID int64, price float64, availability, url string) error
 	InsertPriceHistory(ctx context.Context, componentID string, shopID int64, price float64) error
 	GetShopIDByCode(ctx context.Context, code string) (int64, error)
@@ -23,6 +24,7 @@ type OffersRepository interface {
 
 type OffersUseCase interface {
 	GetOffers(ctx context.Context, filter domain.OffersFilter) ([]domain.Offer, error)
+	GetMinPrice(ctx context.Context, componentID string) (float64, string, error)
 	ImportPriceList(ctx context.Context, records io.Reader) error
 }
 
@@ -49,6 +51,10 @@ func (uc *offersUseCase) GetOffers(ctx context.Context, filter domain.OffersFilt
 		return nil, errors.New("componentId is required")
 	}
 	return uc.repo.FetchOffers(ctx, filter)
+}
+
+func (uc *offersUseCase) GetMinPrice(ctx context.Context, componentID string) (float64, string, error) {
+	return uc.repo.GetMinPrice(ctx, componentID)
 }
 
 func (uc *offersUseCase) ImportPriceList(ctx context.Context, r io.Reader) error {

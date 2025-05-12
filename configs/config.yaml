@@ -332,6 +332,28 @@ paths:
         '404':
           description: Конфигурация не найдена
 
+  /offers/min:
+    get:
+      tags:
+        - Aggregator
+      summary: Минимальная цена по компоненту
+      parameters:
+        - in: query
+          name: componentId
+          required: true
+          schema:
+            type: string
+          description: ID компонента
+      responses:
+        '200':
+          description: Минимальная цена по компоненту
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MinPriceResponse'
+        '400':
+          description: Ошибка валидации запроса
+
   /offers:
     get:
       tags:
@@ -704,3 +726,15 @@ components:
         componentId:
           type: string
       required: [ componentId ]
+    MinPriceResponse:
+      type: object
+      properties:
+        componentId:
+          type: string
+        minPrice:
+          type: number
+        currency:
+          type: string
+        note:
+          type: string
+      required: [ componentId, minPrice, currency ]

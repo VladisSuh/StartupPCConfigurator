@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/golang-jwt/jwt/v4"
 	"log"
 	"net/http/httputil"
 	"net/url"
@@ -75,10 +76,13 @@ func main() {
 	}
 
 	// ---------- AGGREGATOR – защищённые ------------------------------------
+
+	r.GET("/offers/min", proxyKeepPath(agrURL))
+
 	offers := r.Group("/offers", middleware.AuthMiddleware(jwtSecret))
 	{
-		offers.Any("", proxyKeepPath(agrURL))
-		offers.Any("/*proxyPath", proxyKeepPath(agrURL))
+		offers.GET("", proxyKeepPath(agrURL))
+		offers.POST("/import", proxyKeepPath(agrURL))
 	}
 
 	// **НОВЫЙ БЛОК**: /subscriptions → Notifications-service
@@ -158,5 +162,28 @@ func proxyStripPrefix(target, prefix string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Request.URL.Path = strings.TrimPrefix(c.Request.URL.Path, prefix)
 		proxy.ServeHTTP(c.Writer, c.Request)
+	}
+}
+
+func OptionalAuthMiddleware(secret string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authHeader := c.GetHeader("Authorization")
+		if strings.HasPrefix(authHeader, "Bearer ") {
+			tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+			// Разбираем токен с помощью стандартной библиотеки:
+			token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+				// Здесь можно ещё проверить алгоритм: token.Method.Alg()
+				return []byte(secret), nil
+			})
+			if err == nil && token.Valid {
+				if claims, ok := token.Claims.(jwt.MapClaims); ok {
+					// допустим, в subject хранится userID
+					if sub, ok := claims["sub"].(string); ok {
+						c.Set("user_id", sub)
+					}
+				}
+			}
+		}
+		c.Next()
 	}
 }

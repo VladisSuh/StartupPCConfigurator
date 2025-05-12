@@ -259,3 +259,18 @@ func (r *repoImpl) GetShopIDByCode(ctx context.Context, code string) (int64, err
 	}
 	return id, nil
 }
+
+func (r *repoImpl) GetMinPrice(ctx context.Context, componentID string) (float64, string, error) {
+	const q = `
+      SELECT MIN(o.price), o.currency
+        FROM offers o
+       WHERE o.component_id = $1
+       GROUP BY o.currency`
+	var minPrice float64
+	var currency string
+	err := r.db.QueryRowContext(ctx, q, componentID).Scan(&minPrice, &currency)
+	if err == sql.ErrNoRows {
+		return 0, "", nil
+	}
+	return minPrice, currency, err
+}
