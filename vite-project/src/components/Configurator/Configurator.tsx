@@ -9,14 +9,14 @@ const Configurator = () => {
     const [selectedCategory, setSelectedCategory] = useState<string>("cpu");
     const [selectedComponents, setSelectedComponents] = useState<Record<string, Component | null>>({
         cpu: null,
-        ram: null,
-        motherboard: null,
         gpu: null,
-        storage: null,
+        motherboard: null,
+        ram: null,
+        hdd: null,
+        ssd: null,
         cooler: null,
         case: null,
-        soundcard: null,
-        power_supply: null,
+        psu: null,
     });
 
     return (
