@@ -1,104 +1,145 @@
 package usecase
 
+// Расширяем ScenarioRule новыми полями Min/Max для CPU-TDP, RAM, GPU-памяти и PSU
 type ScenarioRule struct {
-	CPUSocketWhitelist []string // допустимые сокеты CPU
-	MaxCPUTDP          int      // максимальный TDP ЦПУ (Вт)
-	RAMType            string
-	MinRAM             int
-	MinGPUMemory       int
-	MinPSUPower        int
-	CaseFormFactors    []string
+	CPUSocketWhitelist         []string
+	MinCPUTDP, MaxCPUTDP       int
+	RAMType                    string
+	MinRAM, MaxRAM             int
+	MinGPUMemory, MaxGPUMemory int
+	MinPSUPower, MaxPSUPower   int
+	CaseFormFactors            []string
 }
 
 var ScenarioRules = map[string]ScenarioRule{
 	"office": {
 		CPUSocketWhitelist: []string{"AM4", "LGA1700"},
-		MaxCPUTDP:          65, // офисным хватит 65 Вт и ниже
+		MinCPUTDP:          0,
+		MaxCPUTDP:          35,
 		RAMType:            "DDR4",
-		MinRAM:             8,
+		MinRAM:             4,
+		MaxRAM:             16,
 		MinGPUMemory:       0,
-		MinPSUPower:        300,
-		CaseFormFactors:    []string{"ATX", "mATX", "Mini-ITX"},
-	},
-	"htpc": {
-		CPUSocketWhitelist: []string{"AM4", "LGA1700"},
-		MaxCPUTDP:          35, // очень низкое тепловыделение
-		RAMType:            "DDR4",
-		MinRAM:             8,
-		MinGPUMemory:       0,
-		MinPSUPower:        300,
-		CaseFormFactors:    []string{"Mini-ITX"},
+		MaxGPUMemory:       4,
+		MinPSUPower:        150,
+		MaxPSUPower:        300,
+		CaseFormFactors:    []string{"Mini-ITX", "Micro-ATX"},
 	},
 	"gaming": {
 		CPUSocketWhitelist: []string{"AM4", "LGA1700", "AM5"},
-		MaxCPUTDP:          125, // допускаем «тяжёлые» ЦПУ
+		MinCPUTDP:          65,
+		MaxCPUTDP:          125,
 		RAMType:            "DDR4",
 		MinRAM:             16,
+		MaxRAM:             64,
 		MinGPUMemory:       6,
+		MaxGPUMemory:       16,
 		MinPSUPower:        650,
-		CaseFormFactors:    []string{"ATX", "mATX"},
+		MaxPSUPower:        1000,
+		CaseFormFactors:    []string{"ATX", "Micro-ATX"},
+	},
+	"htpc": {
+		CPUSocketWhitelist: []string{"AM4", "LGA1700"},
+		MinCPUTDP:          0,
+		MaxCPUTDP:          35,
+		RAMType:            "DDR4",
+		MinRAM:             8,
+		MaxRAM:             16,
+		MinGPUMemory:       0,
+		MaxGPUMemory:       4,
+		MinPSUPower:        300,
+		MaxPSUPower:        500,
+		CaseFormFactors:    []string{"Mini-ITX"},
 	},
 	"streamer": {
 		CPUSocketWhitelist: []string{"AM4", "LGA1700", "AM5"},
+		MinCPUTDP:          65,
 		MaxCPUTDP:          125,
 		RAMType:            "DDR4",
 		MinRAM:             32,
+		MaxRAM:             64,
 		MinGPUMemory:       6,
+		MaxGPUMemory:       12,
 		MinPSUPower:        750,
-		CaseFormFactors:    []string{"ATX", "mATX"},
+		MaxPSUPower:        1200,
+		CaseFormFactors:    []string{"ATX", "Micro-ATX"},
 	},
 	"design": {
 		CPUSocketWhitelist: []string{"AM5"},
+		MinCPUTDP:          95,
 		MaxCPUTDP:          170,
 		RAMType:            "DDR5",
 		MinRAM:             32,
+		MaxRAM:             128,
 		MinGPUMemory:       10,
+		MaxGPUMemory:       24,
 		MinPSUPower:        650,
+		MaxPSUPower:        1200,
 		CaseFormFactors:    []string{"ATX"},
 	},
 	"video": {
 		CPUSocketWhitelist: []string{"AM5"},
+		MinCPUTDP:          95,
 		MaxCPUTDP:          170,
 		RAMType:            "DDR5",
 		MinRAM:             64,
+		MaxRAM:             128,
 		MinGPUMemory:       10,
+		MaxGPUMemory:       24,
 		MinPSUPower:        750,
+		MaxPSUPower:        1200,
 		CaseFormFactors:    []string{"ATX"},
 	},
 	"cad": {
 		CPUSocketWhitelist: []string{"AM5", "LGA1700"},
+		MinCPUTDP:          95,
 		MaxCPUTDP:          170,
 		RAMType:            "DDR5",
 		MinRAM:             64,
+		MaxRAM:             128,
 		MinGPUMemory:       4,
+		MaxGPUMemory:       12,
 		MinPSUPower:        650,
+		MaxPSUPower:        1000,
 		CaseFormFactors:    []string{"ATX"},
 	},
 	"dev": {
 		CPUSocketWhitelist: []string{"AM4", "LGA1700"},
-		MaxCPUTDP:          95, // средний CPU до 95 Вт
+		MinCPUTDP:          35,
+		MaxCPUTDP:          95,
 		RAMType:            "DDR4",
 		MinRAM:             16,
+		MaxRAM:             64,
 		MinGPUMemory:       0,
+		MaxGPUMemory:       8,
 		MinPSUPower:        550,
-		CaseFormFactors:    []string{"ATX", "mATX", "Mini-ITX"},
+		MaxPSUPower:        800,
+		CaseFormFactors:    []string{"ATX", "Micro-ATX", "Mini-ITX"},
 	},
 	"enthusiast": {
 		CPUSocketWhitelist: []string{"AM5", "LGA1700"},
+		MinCPUTDP:          95,
 		MaxCPUTDP:          170,
 		RAMType:            "DDR5",
 		MinRAM:             32,
+		MaxRAM:             128,
 		MinGPUMemory:       8,
+		MaxGPUMemory:       24,
 		MinPSUPower:        850,
+		MaxPSUPower:        1500,
 		CaseFormFactors:    []string{"ATX"},
 	},
 	"nas": {
 		CPUSocketWhitelist: []string{"AM4", "LGA1700"},
+		MinCPUTDP:          0,
 		MaxCPUTDP:          65,
 		RAMType:            "DDR4",
 		MinRAM:             8,
+		MaxRAM:             32,
 		MinGPUMemory:       0,
+		MaxGPUMemory:       4,
 		MinPSUPower:        300,
+		MaxPSUPower:        500,
 		CaseFormFactors:    []string{"Mini-ITX"},
 	},
 }

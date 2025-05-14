@@ -1,129 +1,159 @@
 package usecase
 
 import (
-	"StartupPCConfigurator/internal/domain"
 	"encoding/json"
+	"fmt"
 	"strings"
+
+	"StartupPCConfigurator/internal/domain"
 )
 
+// CheckCompatibility проверяет полную сборку и возвращает список ошибок, если что-то не совместимо.
+// Поддерживаем проверки:
+//   - CPU ↔ MB (socket)
+//   - RAM ↔ MB (ram_type)
+//   - SSD ↔ MB (interface + form_factor)
+//   - GPU ↔ Case (length_mm)
+//   - CPU ↔ Case (cooler_height)
+//   - PSU ↔ (CPU power_draw + GPU power_draw + 150)
+//   - Case ↔ MB (form_factor входит в список допустимых у корпуса)
 func CheckCompatibility(components []domain.Component) []string {
-	errors := []string{}
-
-	var parsed []struct {
-		Category string
-		Specs    map[string]interface{}
-	}
-
+	errs := []string{}
+	// Распарсим все specs в map по категории
+	specsByCat := map[string]map[string]interface{}{}
 	for _, c := range components {
-		var specs map[string]interface{}
-		if err := json.Unmarshal(c.Specs, &specs); err != nil {
+		var m map[string]interface{}
+		if err := json.Unmarshal(c.Specs, &m); err != nil {
 			continue
 		}
-		parsed = append(parsed, struct {
-			Category string
-			Specs    map[string]interface{}
-		}{
-			Category: c.Category,
-			Specs:    specs,
-		})
+		specsByCat[strings.ToLower(c.Category)] = m
 	}
 
-	var cpu, mb, ram, gpu, psu, caseComp *map[string]interface{}
+	cpu := specsByCat["cpu"]
+	mb := specsByCat["motherboard"]
+	ram := specsByCat["ram"]
+	gpu := specsByCat["gpu"]
+	psu := specsByCat["psu"]
+	cs := specsByCat["case"]
+	ssd := specsByCat["ssd"]
 
-	for _, c := range parsed {
-		switch c.Category {
-		case "cpu":
-			cpu = &c.Specs
-		case "motherboard":
-			mb = &c.Specs
-		case "ram":
-			ram = &c.Specs
-		case "gpu":
-			gpu = &c.Specs
-		case "psu":
-			psu = &c.Specs
-		case "case":
-			caseComp = &c.Specs
-		}
-	}
-
+	// 1) CPU ↔ MB: socket
 	if cpu != nil && mb != nil {
-		if (*cpu)["socket"] != (*mb)["socket"] {
-			errors = append(errors, "CPU и Motherboard несовместимы (socket)")
+		if cpu["socket"] != mb["socket"] {
+			errs = append(errs, fmt.Sprintf("CPU.socket %v ≠ MB.socket %v", cpu["socket"], mb["socket"]))
 		}
 	}
-
+	// 2) RAM ↔ MB: ram_type
 	if ram != nil && mb != nil {
-		if (*ram)["ram_type"] != (*mb)["ram_type"] {
-			errors = append(errors, "RAM и Motherboard несовместимы (тип памяти)")
+		if ram["ram_type"] != mb["ram_type"] {
+			errs = append(errs, fmt.Sprintf("RAM.ram_type %v ≠ MB.ram_type %v", ram["ram_type"], mb["ram_type"]))
 		}
 	}
-
-	if gpu != nil && caseComp != nil {
-		gpuLen, ok1 := (*gpu)["length_mm"].(float64)
-		caseMaxLen, ok2 := (*caseComp)["gpu_max_length"].(float64)
-		if ok1 && ok2 && gpuLen > caseMaxLen {
-			errors = append(errors, "GPU слишком длинная для корпуса")
+	// 3) SSD ↔ MB: interface + form_factor
+	if ssd != nil && mb != nil {
+		// интерфейс
+		if ssd["interface"] != mb["pcie_version"] && ssd["interface"] != mb["interface"] {
+			errs = append(errs, fmt.Sprintf("SSD.interface %v ≠ MB.pcie_version %v", ssd["interface"], mb["pcie_version"]))
 		}
-	}
-
-	if cpu != nil && caseComp != nil {
-		coolerHeight, ok1 := (*cpu)["cooler_height"].(float64)
-		caseMaxHeight, ok2 := (*caseComp)["cooler_max_height"].(float64)
-		if ok1 && ok2 && coolerHeight > caseMaxHeight {
-			errors = append(errors, "Кулер не помещается в корпус по высоте")
-		}
-	}
-
-	if psu != nil && gpu != nil {
-		gpuPower, ok1 := (*gpu)["power_draw"].(float64)
-		psuPower, ok2 := (*psu)["power"].(float64)
-		if ok1 && ok2 && psuPower < gpuPower+150 {
-			errors = append(errors, "PSU может быть слишком слабым для GPU")
-		}
-	}
-
-	return errors
-}
-
-// GenerateConfigurations перебирает все доступные компоненты и возвращает
-// только те сборки, где CheckCompatibility не находит несовместимостей.
-func GenerateConfigurations(allComponents []domain.Component) [][]domain.Component {
-	// 1) Группируем все по нормализованным категориям
-	categories := map[string][]domain.Component{
-		"cpu":         {},
-		"motherboard": {},
-		"ram":         {},
-		"gpu":         {},
-		"psu":         {},
-		"case":        {},
-	}
-	for _, c := range allComponents {
-		cat := strings.ToLower(c.Category)
-		if _, ok := categories[cat]; ok {
-			categories[cat] = append(categories[cat], c)
-		}
-	}
-
-	configs := make([][]domain.Component, 0)
-
-	// 2) Перебираем все возможные комбинации
-	for _, cpu := range categories["cpu"] {
-		for _, mb := range categories["motherboard"] {
-			for _, ram := range categories["ram"] {
-				for _, gpu := range categories["gpu"] {
-					for _, psu := range categories["psu"] {
-						for _, caseComp := range categories["case"] {
-							combo := []domain.Component{cpu, mb, ram, gpu, psu, caseComp}
-							if len(CheckCompatibility(combo)) == 0 {
-								configs = append(configs, combo)
-							}
-						}
-					}
+		// форм-фактор (M.2 vs число слотов)
+		if ssdFF, ok := ssd["form_factor"].(string); ok {
+			if ssdFF == "M.2" {
+				if m2, ok := mb["m2_slots"].(float64); !ok || m2 < 1 {
+					errs = append(errs, "SSD требует M.2-слот, а MB не поддерживает")
 				}
 			}
 		}
 	}
+	// 4) GPU ↔ Case: длина
+	if gpu != nil && cs != nil {
+		if gl, ok1 := gpu["length_mm"].(float64); ok1 {
+			if cm, ok2 := cs["gpu_max_length"].(float64); ok2 && gl > cm {
+				errs = append(errs, fmt.Sprintf("GPU.length_mm %.0f > Case.gpu_max_length %.0f", gl, cm))
+			}
+		}
+	}
+	// 5) CPU ↔ Case: высота кулера
+	if cpu != nil && cs != nil {
+		if ch, ok1 := cpu["cooler_height"].(float64); ok1 {
+			if cmh, ok2 := cs["cooler_max_height"].(float64); ok2 && ch > cmh {
+				errs = append(errs, fmt.Sprintf("CPU.cooler_height %.0f > Case.cooler_max_height %.0f", ch, cmh))
+			}
+		}
+	}
+	// 6) Case ↔ MB: form_factor входит в список
+	if cs != nil && mb != nil {
+		if allowed, ok := cs["max_motherboard_form_factors"].([]interface{}); ok {
+			ff := mb["form_factor"]
+			okf := false
+			for _, x := range allowed {
+				if x == ff {
+					okf = true
+					break
+				}
+			}
+			if !okf {
+				errs = append(errs, fmt.Sprintf("MB.form_factor %v не поддерживается Case", ff))
+			}
+		}
+	}
+	// 7) PSU ↔ CPU+GPU: мощность
+	if psu != nil {
+		need := 150.0 // запас
+		if cpu != nil {
+			if d, ok := cpu["power_draw"].(float64); ok {
+				need += d
+			}
+		}
+		if gpu != nil {
+			if d, ok := gpu["power_draw"].(float64); ok {
+				need += d
+			}
+		}
+		if p, ok := psu["power"].(float64); ok && p < need {
+			errs = append(errs, fmt.Sprintf("PSU.power %.0f < required %.0f", p, need))
+		}
+	}
 
-	return configs
+	return errs
+}
+
+// GenerateConfigurations возвращает все возможные сборки из всех категорий
+// с учётом CheckCompatibility. Делает бэктрекинг с ранней отбраковкой.
+func GenerateConfigurations(allComponents []domain.Component) [][]domain.Component {
+	// сгруппируем по категориям
+	categories := map[string][]domain.Component{}
+	for _, c := range allComponents {
+		key := strings.ToLower(c.Category)
+		categories[key] = append(categories[key], c)
+	}
+	// список категорий, которые участвуют в сборке
+	order := []string{"cpu", "motherboard", "ram", "ssd", "hdd", "gpu", "psu", "case", "cooler"}
+
+	var results [][]domain.Component
+	var current []domain.Component
+
+	var backtrack func(idx int)
+	backtrack = func(idx int) {
+		if idx == len(order) {
+			// коньченый набор — проверяем всю сборку
+			if len(CheckCompatibility(current)) == 0 {
+				combo := make([]domain.Component, len(current))
+				copy(combo, current)
+				results = append(results, combo)
+			}
+			return
+		}
+		cat := order[idx]
+		for _, comp := range categories[cat] {
+			current = append(current, comp)
+			// частичная проверка: если хоть одна ошибка — отсекаем
+			if len(CheckCompatibility(current)) == 0 {
+				backtrack(idx + 1)
+			}
+			current = current[:len(current)-1]
+		}
+	}
+
+	backtrack(0)
+	return results
 }

@@ -32,7 +32,7 @@ Content-Type: application/json
 #       "expires_at":   "..."
 #   }
 ################################################################################
-@access_token  = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImtyYXNpbmFfMjAwM0BtYWlsLnJ1IiwiZXhwIjoxNzQ3MTYzNTU3LCJ1c2VyX2lkIjoiYzA5ZGViZWMtN2E1Zi00MzIxLWI3N2QtMTUyODU4N2FjMmVjIn0.C0Q_yJnvGlefACln9ejALZWxv9stJg_cJmEaMYDGwWw
+@access_token  = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImtyYXNpbmFfMjAwM0BtYWlsLnJ1IiwiZXhwIjoxNzQ3MzE1OTUzLCJ1c2VyX2lkIjoiYWQxYjNlYjEtOWYxYi00YjAyLWFjODgtNzM5NWY1MzQ3YzdiIn0.rXU0IUsScq__QuyfuvyriBf6XEy5jhR3d5RIcEdVibk
 @refresh_token = 2
 
 ################################################################################
@@ -117,7 +117,7 @@ GET {{config_host}}/config/components?category=hdd
 Authorization: Bearer {{access_token}}
 
 ### 11.2 поиск компонентов по названию
-GET {{config_host}}/config/components?search=AMD%Ryzen%5%5600X
+GET {{config_host}}/config/components?search=AMD%20Ryzen%205%205600X
 Authorization: Bearer {{access_token}}
 
 ################################################################################
@@ -169,8 +169,7 @@ Authorization: Bearer {{access_token}}
   ]
 }
 
-################################################################################
-### 14. получить совместимые компоненты
+
 ################################################################################
 ### 14. получить совместимые компоненты
 
@@ -250,7 +249,7 @@ Authorization: Bearer {{access_token}}
 ### A. Несовместимость по socket (CPU ↔︎ Motherboard)
 @config_name1 = InvalidSocketBuild
 
-POST {{config_host}}/config-secure/newconfig
+POST {{config_host}}/config/newconfig
 Content-Type: application/json
 Authorization: Bearer {{access_token}}
 
@@ -281,7 +280,7 @@ Content-Type: application/json
 ### B. Несовместимость по типу памяти (RAM ↔ Motherboard)
 @config_name2 = InvalidRamBuild
 
-POST {{config_host}}/config-secure/newconfig
+POST {{config_host}}/config/newconfig
 Content-Type: application/json
 Authorization: Bearer {{access_token}}
 

@@ -45,6 +45,19 @@ func (s *configService) FetchCompatibleComponentsMulti(
 	category string,
 	bases []domain.ComponentRef,
 ) ([]domain.Component, error) {
+	// 1) Если ищем кулеры — сразу отфильтруем bases так, чтобы в нём были только CPU и Case
+	if strings.EqualFold(category, "cooler") {
+		var filtered []domain.ComponentRef
+		for _, ref := range bases {
+			if strings.EqualFold(ref.Category, "cpu") ||
+				strings.EqualFold(ref.Category, "case") {
+				filtered = append(filtered, ref)
+			}
+		}
+		bases = filtered
+	}
+
+	// 2) Собираем все specs в одну карту и считаем нагрузку на PSU
 	merged := make(map[string]interface{})
 	var totalDraw float64
 
@@ -57,31 +70,22 @@ func (s *configService) FetchCompatibleComponentsMulti(
 		if err := json.Unmarshal(base.Specs, &m); err != nil {
 			return nil, fmt.Errorf("invalid specs for %s/%s: %w", ref.Category, ref.Name, err)
 		}
-		// мержим базовые поля
+
+		// мёржим всё
 		for k, v := range m {
 			merged[k] = v
 		}
-		// аккумулируем для PSU
-		if strings.EqualFold(category, "psu") {
-			if ref.Category == "cpu" || ref.Category == "gpu" {
-				if d, ok := m["power_draw"].(float64); ok {
-					totalDraw += d
-				}
+
+		// если целевая категория PSU — аккумулируем power_draw от CPU и GPU
+		if strings.EqualFold(category, "psu") &&
+			(strings.EqualFold(ref.Category, "cpu") || strings.EqualFold(ref.Category, "gpu")) {
+			if d, ok := m["power_draw"].(float64); ok {
+				totalDraw += d
 			}
 		}
-	}
-	// Если ищем кулеры, то нам нужны только CPU и Case
-	if strings.EqualFold(category, "cooler") {
-		filtered := make([]domain.ComponentRef, 0, len(bases))
-		for _, ref := range bases {
-			if strings.EqualFold(ref.Category, "cpu") || strings.EqualFold(ref.Category, "case") {
-				filtered = append(filtered, ref)
-			}
-		}
-		bases = filtered
 	}
 
-	// спец-преобразования для целевой категории
+	// 3) Преобразования под каждую категорию
 	switch strings.ToLower(category) {
 	case "case":
 		if h, ok := merged["cooler_height"]; ok {
@@ -94,35 +98,36 @@ func (s *configService) FetchCompatibleComponentsMulti(
 		}
 
 	case "psu":
-		// перезаписываем specs только мощностью + запас
-		merged = map[string]interface{}{"power": totalDraw + 150}
+		// только требуемая мощность
+		merged = map[string]interface{}{
+			"power": totalDraw + 150,
+		}
 
 	case "ssd":
-		// 1) Интерфейс NVMe или SATA
+		// интерфейс: NVMe или SATA
 		if v, ok := merged["pcie_version"]; ok {
 			merged["interface"] = v
 		} else if _, ok := merged["sata_ports"]; ok {
-			// если есть sata_ports, поддерживается SATA
 			merged["interface"] = "SATA III"
 		}
-		// 2) Форм-фактор M.2 или 2.5"
+		// форм-фактор: M.2 или 2.5"
 		if slots, ok := merged["m2_slots"].(float64); ok && slots >= 1 {
 			merged["form_factor"] = "M.2"
 		} else {
 			merged["form_factor"] = "2.5"
 		}
+
 	case "cooler":
-		// CPU.socket уже попал в merged["socket"],
-		// а для высоты кулера используем свободный зазор из корпуса:
-		if h, ok := merged["cooler_max_height"]; ok {
-			// отсекаем кулеры выше этого значения
-			merged = map[string]interface{}{
-				"socket":    merged["socket"],
-				"height_mm": h,
-			}
+		// собираем только socket + height_mm
+		height, _ := merged["cooler_max_height"]
+		socket, _ := merged["socket"]
+		merged = map[string]interface{}{
+			"socket":    socket,
+			"height_mm": height,
 		}
 	}
 
+	// 4) Формируем и отправляем фильтр
 	filter := domain.CompatibilityFilter{
 		Category: category,
 		Specs:    merged,
@@ -246,38 +251,32 @@ func (s *configService) GenerateConfigurations(refs []domain.ComponentRef) ([][]
 	return filtered, nil
 }
 
+// 4) Функция matchesScenario рядом, в том же файле
 func (s *configService) GetUseCaseBuild(usecaseName string) ([]domain.Component, error) {
-	// а) Берём правило для этого сценария
 	rule, ok := ScenarioRules[usecaseName]
 	if !ok {
 		return nil, fmt.Errorf("unknown use case %q", usecaseName)
 	}
 
-	// б) Загружаем все компоненты из репозитория
 	all, err := s.repo.GetComponents("", "")
 	if err != nil {
 		return nil, fmt.Errorf("failed to load components: %w", err)
 	}
 
-	// в) Генерируем все совместимые сборки
 	combos := GenerateConfigurations(all)
-
-	// г) Фильтруем по сценарию
 	for _, combo := range combos {
 		if matchesScenario(combo, rule) {
-			// для простоты возвращаем первую подходящую сборку
 			return combo, nil
 		}
 	}
-
 	return nil, fmt.Errorf("no builds found for use case %q", usecaseName)
 }
 
-// 4) Функция matchesScenario рядом, в том же файле
+// matchesScenario проверяет, подходит ли комбинация компонентов под правило ScenarioRule.
 func matchesScenario(combo []domain.Component, rule ScenarioRule) bool {
 	var cpu, mb, ram, gpu, psu, cs *domain.Component
 
-	// разбираем combo по категориям
+	// Разбираем combo по категориям
 	for i := range combo {
 		switch strings.ToLower(combo[i].Category) {
 		case "cpu":
@@ -294,51 +293,66 @@ func matchesScenario(combo []domain.Component, rule ScenarioRule) bool {
 			cs = &combo[i]
 		}
 	}
-	// проверяем, что все ключевые компоненты на месте
+	// Все ключевые компоненты должны присутствовать
 	if cpu == nil || mb == nil || ram == nil || psu == nil || cs == nil {
 		return false
 	}
 
-	// распаковываем specs
+	// Распаковываем JSON specs в map[string]interface{}
 	specsCPU := parseSpecs(cpu.Specs)
 	specsMB := parseSpecs(mb.Specs)
 	specsRAM := parseSpecs(ram.Specs)
 	specsPSU := parseSpecs(psu.Specs)
 	specsCase := parseSpecs(cs.Specs)
 
-	// CPU: сокет и TDP
-	sock := specsCPU["socket"].(string)
+	// 1) CPU: socket в белом списке
+	sock, _ := specsCPU["socket"].(string)
 	if !contains(rule.CPUSocketWhitelist, sock) {
 		return false
 	}
-	if tdp, ok := specsCPU["tdp"].(float64); ok && int(tdp) > rule.MaxCPUTDP {
-		return false
+	// 2) CPU: TDP (мин/макс)
+	if tdpRaw, ok := specsCPU["tdp"].(float64); ok {
+		tdp := int(tdpRaw)
+		if rule.MinCPUTDP > 0 && tdp < rule.MinCPUTDP {
+			return false
+		}
+		if rule.MaxCPUTDP > 0 && tdp > rule.MaxCPUTDP {
+			return false
+		}
 	}
 
-	// Motherboard: поддержка типа RAM
-	if specsMB["ram_type"].(string) != rule.RAMType {
-		return false
+	// 3) Motherboard ↔ RAM: тип памяти
+	if rule.RAMType != "" {
+		if mbType, _ := specsMB["ram_type"].(string); mbType != rule.RAMType {
+			return false
+		}
+		if ramType, _ := specsRAM["ram_type"].(string); ramType != rule.RAMType {
+			return false
+		}
+	}
+	// 4) RAM: объём (мин/макс)
+	if capRaw, ok := specsRAM["capacity"].(float64); ok {
+		cap := int(capRaw)
+		if rule.MinRAM > 0 && cap < rule.MinRAM {
+			return false
+		}
+		if rule.MaxRAM > 0 && cap > rule.MaxRAM {
+			return false
+		}
 	}
 
-	// RAM: тип и объём
-	if specsRAM["ram_type"].(string) != rule.RAMType {
-		return false
-	}
-	if cap, ok := specsRAM["capacity"].(float64); ok && int(cap) < rule.MinRAM {
-		return false
-	}
-
-	// GPU: проверяем только если сценарий требует дискретку
-	if rule.MinGPUMemory > 0 {
+	// 5) GPU: память (мин/макс)
+	if rule.MinGPUMemory > 0 || rule.MaxGPUMemory > 0 {
 		if gpu == nil {
 			return false
 		}
 		specsGPU := parseSpecs(gpu.Specs)
-		// ожидаем строку вида "12GB"
-		if memStr, ok := specsGPU["memory"].(string); ok {
-			var memVal int
-			fmt.Sscanf(memStr, "%dGB", &memVal)
-			if memVal < rule.MinGPUMemory {
+		if memRaw, ok := specsGPU["memory_gb"].(float64); ok {
+			mem := int(memRaw)
+			if rule.MinGPUMemory > 0 && mem < rule.MinGPUMemory {
+				return false
+			}
+			if rule.MaxGPUMemory > 0 && mem > rule.MaxGPUMemory {
 				return false
 			}
 		} else {
@@ -346,14 +360,28 @@ func matchesScenario(combo []domain.Component, rule ScenarioRule) bool {
 		}
 	}
 
-	// PSU: мощность
-	if pow, ok := specsPSU["power"].(float64); ok && int(pow) < rule.MinPSUPower {
-		return false
+	// 6) PSU: мощность (мин/макс)
+	if powRaw, ok := specsPSU["power"].(float64); ok {
+		pow := int(powRaw)
+		if rule.MinPSUPower > 0 && pow < rule.MinPSUPower {
+			return false
+		}
+		if rule.MaxPSUPower > 0 && pow > rule.MaxPSUPower {
+			return false
+		}
 	}
 
-	// Case: форм-фактор
-	if ff, ok := specsCase["form_factor_support"].(string); ok {
-		if !contains(rule.CaseFormFactors, ff) {
+	// 7) Case ↔ Motherboard: проверяем, что форм-фактор материнской платы поддерживается корпусом
+	if arr, ok := specsCase["max_motherboard_form_factors"].([]interface{}); ok {
+		mfMB, _ := specsMB["form_factor"].(string)
+		supported := false
+		for _, v := range arr {
+			if s, ok := v.(string); ok && strings.EqualFold(s, mfMB) {
+				supported = true
+				break
+			}
+		}
+		if !supported {
 			return false
 		}
 	}

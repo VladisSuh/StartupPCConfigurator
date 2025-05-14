@@ -113,7 +113,7 @@ type CompatMultiRequest struct {
 	Bases    []domain.ComponentRef `json:"bases"    binding:"required"`
 }
 
-// Новый хендлер для POST /config/compatible
+// GetCompatibleComponentsMulti обрабатывает POST /config/compatible
 func (h *ConfigHandler) GetCompatibleComponentsMulti(c *gin.Context) {
 	var req CompatMultiRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
