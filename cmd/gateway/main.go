@@ -1,12 +1,13 @@
 package main
 
 import (
-	"github.com/golang-jwt/jwt/v4"
 	"log"
 	"net/http/httputil"
 	"net/url"
 	"os"
 	"strings"
+
+	"github.com/golang-jwt/jwt/v4"
 
 	"StartupPCConfigurator/pkg/middleware"
 
@@ -53,7 +54,7 @@ func main() {
 
 	// ---------- CONFIG – публичные -----------------------------------------
 	r.GET("/config/components", reverseProxyPath(configURL, "/components"))
-	r.GET("/config/compatible", reverseProxyPath(configURL, "/compatible"))
+	r.POST("/config/compatible", reverseProxyPath(configURL, "/compatible"))
 	r.GET("/config/usecases", reverseProxyPath(configURL, "/usecases"))
 	r.POST("/config/generate", reverseProxyPath(configURL, "/generate"))
 

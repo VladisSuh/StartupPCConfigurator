@@ -279,3 +279,129 @@ INSERT INTO shops (code, name, base_url, api_endpoint)
 VALUES
     ('Citilink', 'Citilink Shop', 'https://www.citilink.ru/', NULL)
 ;
+-- CPUs: добавляем power_draw равный TDP
+UPDATE components
+SET specs = specs || '{"power_draw": 65}'::jsonb
+WHERE id = 1;
+
+UPDATE components
+SET specs = specs || '{"power_draw": 65}'::jsonb
+WHERE id = 2;
+
+UPDATE components
+SET specs = specs || '{"power_draw": 105}'::jsonb
+WHERE id = 3;
+
+-- GPUs: добавляем интерфейс и высоту карты
+UPDATE components
+SET specs = specs || '{"interface": "PCIe 4.0", "height_mm": 40}'::jsonb
+WHERE id = 4;
+
+UPDATE components
+SET specs = specs || '{"interface": "PCIe 4.0", "height_mm": 43}'::jsonb
+WHERE id = 5;
+
+-- Motherboards: max память, слоты, PCIe, M.2 и SATA
+UPDATE components
+SET specs = specs || '{
+  "max_memory_gb": 128,
+  "memory_slots": 4,
+  "pcie_version": "PCIe 4.0",
+  "m2_slots": 2,
+  "sata_ports": 6
+}'::jsonb
+WHERE id = 6;
+
+UPDATE components
+SET specs = specs || '{
+  "max_memory_gb": 128,
+  "memory_slots": 4,
+  "pcie_version": "PCIe 5.0",
+  "m2_slots": 2,
+  "sata_ports": 6
+}'::jsonb
+WHERE id = 7;
+
+-- RAM: количество модулей и напряжение
+UPDATE components
+SET specs = specs || '{"modules": 2, "voltage": 1.35}'::jsonb
+WHERE id IN (8, 9);
+
+UPDATE components
+SET specs = specs || '{"modules": 2, "voltage": 1.25}'::jsonb
+WHERE id = 10;
+
+-- SSD: ёмкость, ключ M.2 и пропускная способность
+UPDATE components
+SET specs = specs || '{"capacity_gb": 1000, "m2_key": "M", "max_throughput": 7000}'::jsonb
+WHERE id = 11;
+
+UPDATE components
+SET specs = specs || '{"capacity_gb": 1000, "m2_key": "M", "max_throughput": 5000}'::jsonb
+WHERE id = 12;
+
+UPDATE components
+SET specs = specs || '{"capacity_gb": 500,  "m2_key": "M", "max_throughput": 3400}'::jsonb
+WHERE id = 13;
+
+UPDATE components
+SET specs = specs || '{"capacity_gb": 500,  "m2_key": "M", "max_throughput": 2200}'::jsonb
+WHERE id = 14;
+
+-- HDD: ёмкость
+UPDATE components
+SET specs = specs || '{"capacity_gb": 4000}'::jsonb
+WHERE id = 15;
+
+UPDATE components
+SET specs = specs || '{"capacity_gb": 4000}'::jsonb
+WHERE id = 16;
+
+-- PSUs: эффективность, модульность и форм-фактор
+UPDATE components
+SET specs = specs || '{"efficiency": "80 Plus Gold", "modular": true,  "form_factor": "ATX"}'::jsonb
+WHERE id IN (17, 18, 19);
+
+UPDATE components
+SET specs = specs || '{"efficiency": "80 Plus Gold", "modular": false, "form_factor": "SFX"}'::jsonb
+WHERE id = 23;
+
+-- Cases: поддержка форм-факторов плат, длина блока питания, и корзины для дисков
+UPDATE components
+SET specs = specs || '{
+  "max_motherboard_form_factors": ["ATX", "Micro-ATX", "Mini-ITX"],
+  "max_psu_length": 200,
+  "psu_form_factor": "ATX",
+  "drive_bays_2_5": 2,
+  "drive_bays_3_5": 2
+}'::jsonb
+WHERE id IN (20, 22);
+
+UPDATE components
+SET specs = specs || '{
+  "max_motherboard_form_factors": ["Mini-ITX"],
+  "max_psu_length": 130,
+  "psu_form_factor": "SFX",
+  "drive_bays_2_5": 1,
+  "drive_bays_3_5": 0
+}'::jsonb
+WHERE id = 21;
+
+
+-- пример вставки вручную
+INSERT INTO components (name, category, brand, specs, created_at, updated_at)
+VALUES
+  (
+    'BeQuiet Shadow Rock 3',
+    'cooler',
+    'BeQuiet',
+    '{"socket":"AM4","height_mm":160}',
+    NOW(), NOW()
+  ),
+  (
+    'Noctua NH-D15',
+    'cooler',
+    'Noctua',
+    '{"socket":"AM4","height_mm":165}',
+    NOW(), NOW()
+  );

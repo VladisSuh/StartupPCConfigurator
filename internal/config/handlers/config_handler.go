@@ -4,7 +4,6 @@ import (
 	"StartupPCConfigurator/internal/domain"
 	"errors"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"StartupPCConfigurator/internal/config/usecase"
@@ -108,33 +107,20 @@ func (h *ConfigHandler) UpdateConfig(c *gin.Context) {
 	c.JSON(http.StatusOK, updatedConfig)
 }
 
-// GetCompatibleComponents обрабатывает GET /config/compatible
-func (h *ConfigHandler) GetCompatibleComponents(c *gin.Context) {
-	filter := domain.CompatibilityFilter{
-		Category:   c.Query("category"),
-		CPUSocket:  c.Query("cpuSocket"),
-		RAMType:    c.Query("memoryType"),
-		FormFactor: c.Query("formFactor"),
-	}
+// Новый тип запроса под POST /config/compatible
+type CompatMultiRequest struct {
+	Category string                `json:"category" binding:"required"`
+	Bases    []domain.ComponentRef `json:"bases"    binding:"required"`
+}
 
-	// Пример распарсить числовые значения, если они есть
-	if val := c.Query("gpuLengthMM"); val != "" {
-		if f, err := strconv.ParseFloat(val, 64); err == nil {
-			filter.GPULengthMM = f
-		}
+// Новый хендлер для POST /config/compatible
+func (h *ConfigHandler) GetCompatibleComponentsMulti(c *gin.Context) {
+	var req CompatMultiRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		return
 	}
-	if val := c.Query("coolerHeightMM"); val != "" {
-		if f, err := strconv.ParseFloat(val, 64); err == nil {
-			filter.CoolerHeightMM = f
-		}
-	}
-	if val := c.Query("powerRequired"); val != "" {
-		if f, err := strconv.ParseFloat(val, 64); err == nil {
-			filter.PowerRequired = f
-		}
-	}
-
-	comps, err := h.service.FetchCompatibleComponents(filter)
+	comps, err := h.service.FetchCompatibleComponentsMulti(req.Category, req.Bases)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

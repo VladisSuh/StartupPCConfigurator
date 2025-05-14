@@ -47,7 +47,7 @@ func main() {
 
 	// 6. Публичные ручки
 	r.GET("/components", h.GetComponents)
-	r.GET("/compatible", h.GetCompatibleComponents)
+	r.POST("/compatible", h.GetCompatibleComponentsMulti)
 	r.GET("/usecases", h.ListUseCases)
 	r.GET("/usecase/:name", h.GetUseCaseBuild)
 	r.POST("/generate", h.GenerateConfigs)

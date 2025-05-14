@@ -34,13 +34,13 @@ type Token struct {
 
 // Структура для таблицы components
 type Component struct {
-	ID        int             `db:"id"        json:"id"`
-	Name      string          `db:"name"      json:"name"`
-	Category  string          `db:"category"  json:"category"`
-	Brand     string          `db:"brand"     json:"brand,omitempty"`
-	Specs     json.RawMessage `db:"specs"     json:"specs"` // <-- ключевое
-	CreatedAt time.Time       `db:"created_at" json:"created_at"`
-	UpdatedAt time.Time       `db:"updated_at" json:"updated_at"`
+	ID        int             `gorm:"primaryKey" json:"id"`
+	Name      string          `json:"name"`
+	Category  string          `json:"category"`
+	Brand     string          `json:"brand,omitempty"`
+	Specs     json.RawMessage `gorm:"type:jsonb"       json:"specs"`
+	CreatedAt time.Time       `json:"created_at"`
+	UpdatedAt time.Time       `json:"updated_at"`
 }
 
 // Это то, что мы получаем в CreateConfigRequest/UpdateConfigRequest
@@ -91,13 +91,9 @@ type UpdateEvent struct {
 }
 
 type CompatibilityFilter struct {
-	Category       string  // например "motherboard"
-	CPUSocket      string  // например "AM4"
-	RAMType        string  // например "DDR4"
-	FormFactor     string  // например "ATX"
-	GPULengthMM    float64 // например 300.0
-	CoolerHeightMM float64 // например 160.0
-	PowerRequired  float64 // для GPU (в ваттах)
+	Category      string // например "motherboard"
+	NameComponent string
+	Specs         map[string]interface{}
 }
 
 // UseCase — описание сценария сборки

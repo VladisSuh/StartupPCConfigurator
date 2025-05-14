@@ -31,67 +31,67 @@ type configRepository struct {
 }
 
 func (r *configRepository) GetCompatibleComponents(filter domain.CompatibilityFilter) ([]domain.Component, error) {
+	// 1) Список «разрешённых» полей для каждой целевой категории
+	allowedByCategory := map[string][]string{
+		"motherboard": {"socket", "ram_type", "form_factor", "max_memory_gb", "pcie_version", "m2_slots", "sata_ports"},
+		"case":        {"form_factor", "gpu_max_length", "cooler_max_height", "max_psu_length", "psu_form_factor"},
+		"psu":         {"power", "power_required", "modular", "efficiency", "form_factor"},
+		"gpu":         {"interface", "power_draw", "length_mm", "height_mm"},
+		"ram":         {"ram_type", "capacity", "frequency", "modules", "voltage"},
+		"ssd":         {"interface", "form_factor", "capacity_gb", "m2_key", "max_throughput"},
+		"hdd":         {"interface", "form_factor", "capacity_gb", "rpm"},
+	}
+
+	allowedKeys := allowedByCategory[strings.ToLower(filter.Category)]
+	allowedSet := make(map[string]bool, len(allowedKeys))
+	for _, k := range allowedKeys {
+		allowedSet[k] = true
+	}
+
+	// 2) Базовый запрос по целевой категории
 	query := `
-		SELECT id, name, category, brand, specs, created_at, updated_at
-		FROM components
-		WHERE LOWER(category) = LOWER($1)
+        SELECT id, name, category, brand, specs, created_at, updated_at
+          FROM components
+         WHERE LOWER(category) = LOWER($1)
 	`
+
 	args := []interface{}{filter.Category}
-	index := 2
+	idx := 2
 
-	if filter.CPUSocket != "" {
-		query += fmt.Sprintf(" AND LOWER(specs->>'socket') = LOWER($%d)", index)
-		args = append(args, filter.CPUSocket)
-		index++
+	// 3) Добавляем условия только по полям, которые есть в allowedSet
+	for key, val := range filter.Specs {
+		if !allowedSet[key] {
+			continue
+		}
+		switch v := val.(type) {
+		case string:
+			query += fmt.Sprintf(" AND LOWER(specs->>'%s') = LOWER($%d)", key, idx)
+			args = append(args, v)
+			idx++
+		case float64:
+			query += fmt.Sprintf(" AND (specs->>'%s')::float >= $%d", key, idx)
+			args = append(args, v)
+			idx++
+		}
 	}
 
-	if filter.RAMType != "" {
-		query += fmt.Sprintf(" AND LOWER(specs->>'ram_type') = LOWER($%d)", index)
-		args = append(args, filter.RAMType)
-		index++
-	}
+	// 4) Debug (можно убрать в production)
+	fmt.Printf("DEBUG GetCompatibleComponents:\nSQL:\n%s\nARGS: %v\n\n", query, args)
 
-	if filter.FormFactor != "" {
-		query += fmt.Sprintf(" AND LOWER(specs->>'form_factor') = LOWER($%d)", index)
-		args = append(args, filter.FormFactor)
-		index++
-	}
-
-	if filter.GPULengthMM > 0 {
-		query += fmt.Sprintf(" AND (specs->>'gpu_max_length')::float >= $%d", index)
-		args = append(args, filter.GPULengthMM)
-		index++
-	}
-
-	if filter.CoolerHeightMM > 0 {
-		query += fmt.Sprintf(" AND (specs->>'cooler_max_height')::float >= $%d", index)
-		args = append(args, filter.CoolerHeightMM)
-		index++
-	}
-
-	if filter.PowerRequired > 0 {
-		query += fmt.Sprintf(" AND (specs->>'power')::float >= $%d", index)
-		args = append(args, filter.PowerRequired)
-		index++
-	}
-
+	// 5) Выполняем запрос
 	rows, err := r.db.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var result []domain.Component
+	// 6) Сканируем результаты в непустой слайс
+	result := make([]domain.Component, 0)
 	for rows.Next() {
 		var c domain.Component
 		if err := rows.Scan(
-			&c.ID,
-			&c.Name,
-			&c.Category,
-			&c.Brand,
-			&c.Specs,
-			&c.CreatedAt,
-			&c.UpdatedAt,
+			&c.ID, &c.Name, &c.Category, &c.Brand,
+			&c.Specs, &c.CreatedAt, &c.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}

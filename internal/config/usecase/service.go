@@ -18,8 +18,8 @@ var (
 
 type ConfigService interface {
 	FetchComponents(category, search string) ([]domain.Component, error)
-	FetchCompatibleComponents(filter domain.CompatibilityFilter) ([]domain.Component, error)
 	CreateConfiguration(userId uuid.UUID, name string, comps []domain.ComponentRef) (domain.Configuration, error)
+	FetchCompatibleComponentsMulti(category string, bases []domain.ComponentRef) ([]domain.Component, error)
 	FetchUserConfigurations(userId uuid.UUID) ([]domain.Configuration, error)
 	UpdateConfiguration(userId uuid.UUID, configId string, name string, comps []domain.ComponentRef) (domain.Configuration, error)
 	DeleteConfiguration(userId uuid.UUID, configId string) error
@@ -41,7 +41,92 @@ func (s *configService) FetchComponents(category, search string) ([]domain.Compo
 	return s.repo.GetComponents(category, search)
 }
 
-func (s *configService) FetchCompatibleComponents(filter domain.CompatibilityFilter) ([]domain.Component, error) {
+func (s *configService) FetchCompatibleComponentsMulti(
+	category string,
+	bases []domain.ComponentRef,
+) ([]domain.Component, error) {
+	merged := make(map[string]interface{})
+	var totalDraw float64
+
+	for _, ref := range bases {
+		base, err := s.repo.GetComponentByName(ref.Category, ref.Name)
+		if err != nil {
+			return nil, fmt.Errorf("component not found: %s/%s", ref.Category, ref.Name)
+		}
+		var m map[string]interface{}
+		if err := json.Unmarshal(base.Specs, &m); err != nil {
+			return nil, fmt.Errorf("invalid specs for %s/%s: %w", ref.Category, ref.Name, err)
+		}
+		// мержим базовые поля
+		for k, v := range m {
+			merged[k] = v
+		}
+		// аккумулируем для PSU
+		if strings.EqualFold(category, "psu") {
+			if ref.Category == "cpu" || ref.Category == "gpu" {
+				if d, ok := m["power_draw"].(float64); ok {
+					totalDraw += d
+				}
+			}
+		}
+	}
+	// Если ищем кулеры, то нам нужны только CPU и Case
+	if strings.EqualFold(category, "cooler") {
+		filtered := make([]domain.ComponentRef, 0, len(bases))
+		for _, ref := range bases {
+			if strings.EqualFold(ref.Category, "cpu") || strings.EqualFold(ref.Category, "case") {
+				filtered = append(filtered, ref)
+			}
+		}
+		bases = filtered
+	}
+
+	// спец-преобразования для целевой категории
+	switch strings.ToLower(category) {
+	case "case":
+		if h, ok := merged["cooler_height"]; ok {
+			merged["cooler_max_height"] = h
+		}
+
+	case "gpu":
+		if v, ok := merged["pcie_version"]; ok {
+			merged["interface"] = v
+		}
+
+	case "psu":
+		// перезаписываем specs только мощностью + запас
+		merged = map[string]interface{}{"power": totalDraw + 150}
+
+	case "ssd":
+		// 1) Интерфейс NVMe или SATA
+		if v, ok := merged["pcie_version"]; ok {
+			merged["interface"] = v
+		} else if _, ok := merged["sata_ports"]; ok {
+			// если есть sata_ports, поддерживается SATA
+			merged["interface"] = "SATA III"
+		}
+		// 2) Форм-фактор M.2 или 2.5"
+		if slots, ok := merged["m2_slots"].(float64); ok && slots >= 1 {
+			merged["form_factor"] = "M.2"
+		} else {
+			merged["form_factor"] = "2.5"
+		}
+	case "cooler":
+		// CPU.socket уже попал в merged["socket"],
+		// а для высоты кулера используем свободный зазор из корпуса:
+		if h, ok := merged["cooler_max_height"]; ok {
+			// отсекаем кулеры выше этого значения
+			merged = map[string]interface{}{
+				"socket":    merged["socket"],
+				"height_mm": h,
+			}
+		}
+	}
+
+	filter := domain.CompatibilityFilter{
+		Category: category,
+		Specs:    merged,
+	}
 	return s.repo.GetCompatibleComponents(filter)
 }
 
