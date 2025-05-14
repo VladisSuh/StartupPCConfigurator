@@ -117,7 +117,7 @@ GET {{config_host}}/config/components?category=hdd
 Authorization: Bearer {{access_token}}
 
 ### 11.2 поиск компонентов по названию
-GET {{config_host}}/config/components?search=ryzen
+GET {{config_host}}/config/components?search=AMD%Ryzen%5%5600X
 Authorization: Bearer {{access_token}}
 
 ################################################################################
@@ -171,8 +171,64 @@ Authorization: Bearer {{access_token}}
 
 ################################################################################
 ### 14. получить совместимые компоненты
-GET {{config_host}}/config/compatible?category=motherboard&cpuSocket=AM4
+################################################################################
+### 14. получить совместимые компоненты
+
+# 1) Материнские платы, совместимые с CPU «AMD Ryzen 5 5600X»
+POST {{config_host}}/config/compatible
 Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+  "category": "motherboard",
+  "bases": [
+    { "category": "cpu", "name": "AMD Ryzen 5 5600X" }
+  ]
+}
+
+###
+
+# 2) SSD, совместимые с материнской платой «MSI B550 Tomahawk»
+POST {{config_host}}/config/compatible
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+  "category": "ssd",
+  "bases": [
+    { "category": "motherboard", "name": "MSI B550 Tomahawk" }
+  ]
+}
+
+###
+
+# 3) PSU, способные питать одновременно CPU и GPU
+POST {{config_host}}/config/compatible
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+  "category": "psu",
+  "bases": [
+    { "category": "cpu", "name": "AMD Ryzen 5 5600X" },
+    { "category": "gpu", "name": "NVIDIA GeForce RTX 3060" }
+  ]
+}
+
+###
+
+# 3) Cooler, способные охлаждать CPU и входить в CASE
+POST  {{config_host}}/config/compatible
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+  "category": "cooler",
+  "bases": [
+    { "category":"cpu", "name":"AMD Ryzen 5 5600X" },
+    { "category":"case", "name":"NZXT H510" }
+  ]
+}
 
 ################################################################################
 ### 15. получить конфигурации пользователя
@@ -207,7 +263,7 @@ Authorization: Bearer {{access_token}}
     },
     {
       "category": "motherboard",
-      "name": "ASRock X670E Taichi"
+      "name": "ASUS PRIME B660-PLUS"
     }
   ]
 }
