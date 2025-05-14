@@ -100,58 +100,51 @@ paths:
           description: Не авторизован
 
   /config/compatible:
-    get:
-      tags:
-        - Configurator
+    post:
+      tags: [ Configurator ]
       summary: Получить список совместимых компонентов
-      parameters:
-        - in: query
-          name: category
-          required: true
-          schema:
-            type: string
-            enum: [cpu, gpu, motherboard, ram, hdd, ssd, cooler, case, psu]
-          description: Категория, для которой запрашиваем совместимые компоненты
-        - in: query
-          name: cpu
-          schema:
-            type: string
-          description: Сокет выбранного CPU (например, AM4)
-        - in: query
-          name: ram
-          schema:
-            type: string
-          description: Модуль/набор RAM
-        - in: query
-          name: motherboard
-          schema:
-            type: string
-          description: Тип материнской платы
-        - in: query
-          name: ssd
-          schema:
-            type: string
-          description: SSD-накопитель
-        - in: query
-          name: hdd
-          schema:
-            type: string
-          description: HDD-накопитель
-        - in: query
-          name: gpu
-          schema:
-            type: string
-          description: Выбранная видеокарта
-        - in: query
-          name: psu
-          schema:
-            type: string
-          description: Выбранный блок питания
-        - in: query
-          name: case
-          schema:
-            type: string
-          description: Выбранный компьютерный корпус
+      description: >
+        Возвращает компоненты указанной категории, совместимые с базовыми компонентами
+        из массива `bases`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompatibleRequest'
+            examples:
+              cpu_to_motherboard:
+                summary: Материнские платы, совместимые с CPU
+                value:
+                  category: motherboard
+                  bases:
+                    - category: cpu
+                      name: AMD Ryzen 5 5600X
+              ssd_to_mb:
+                summary: SSD, совместимые с материнской платой
+                value:
+                  category: ssd
+                  bases:
+                    - category: motherboard
+                      name: MSI B550 Tomahawk
+              psu_cpu_gpu:
+                summary: PSU, способные питать CPU и GPU
+                value:
+                  category: psu
+                  bases:
+                    - category: cpu
+                      name: AMD Ryzen 5 5600X
+                    - category: gpu
+                      name: NVIDIA GeForce RTX 3060
+              cooler_cpu_case:
+                summary: Кулер, совместимый с CPU и корпусом
+                value:
+                  category: cooler
+                  bases:
+                    - category: cpu
+                      name: AMD Ryzen 5 5600X
+                    - category: case
+                      name: NZXT H510
       responses:
         '200':
           description: Список совместимых компонентов
@@ -162,7 +155,7 @@ paths:
                 items:
                   $ref: '#/components/schemas/Component'
         '400':
-          description: Неверные параметры запроса
+          description: Неверные данные запроса
   /config/usecases:
     get:
       tags:
@@ -612,6 +605,28 @@ components:
         specs:
           type: object
           additionalProperties: true
+
+    CompatibleBase:
+      type: object
+      properties:
+        category:
+          type: string
+          enum: [ cpu, gpu, motherboard, ram, hdd, ssd, cooler, case, psu ]
+        name:
+          type: string
+      required: [ category, name ]
+
+    CompatibleRequest:
+      type: object
+      properties:
+        category:
+          type: string
+          enum: [ cpu, gpu, motherboard, ram, hdd, ssd, cooler, case, psu ]
+        bases:
+          type: array
+          items:
+            $ref: '#/components/schemas/CompatibleBase'
+      required: [ category, bases ]
 
     CreateConfigRequest:
       type: object

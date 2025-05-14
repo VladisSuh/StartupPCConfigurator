@@ -117,7 +117,7 @@ GET {{config_host}}/config/components?category=hdd
 Authorization: Bearer {{access_token}}
 
 ### 11.2 поиск компонентов по названию
-GET {{config_host}}/config/components?search=AMD%Ryzen%5%5600X
+GET {{config_host}}/config/components?search=AMD%20Ryzen%205%205600X
 Authorization: Bearer {{access_token}}
 
 ################################################################################
