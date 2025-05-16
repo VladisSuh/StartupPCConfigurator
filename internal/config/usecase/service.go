@@ -24,7 +24,7 @@ type ConfigService interface {
 	UpdateConfiguration(userId uuid.UUID, configId string, name string, comps []domain.ComponentRef) (domain.Configuration, error)
 	DeleteConfiguration(userId uuid.UUID, configId string) error
 	GenerateConfigurations(refs []domain.ComponentRef) ([][]domain.Component, error)
-	GetUseCaseBuild(usecaseName string) ([]domain.Component, error)
+	GetUseCaseBuild(usecaseName string, limit int) ([][]domain.Component, error)
 	GenerateUseCaseConfigs(usecaseName string, refs []domain.ComponentRef) ([][]domain.Component, error)
 	ListUseCases() ([]domain.UseCase, error)
 }
@@ -252,7 +252,7 @@ func (s *configService) GenerateConfigurations(refs []domain.ComponentRef) ([][]
 }
 
 // 4) Функция matchesScenario рядом, в том же файле
-func (s *configService) GetUseCaseBuild(usecaseName string) ([]domain.Component, error) {
+func (s *configService) GetUseCaseBuild(usecaseName string, limit int) ([][]domain.Component, error) {
 	rule, ok := ScenarioRules[usecaseName]
 	if !ok {
 		return nil, fmt.Errorf("unknown use case %q", usecaseName)
@@ -264,14 +264,23 @@ func (s *configService) GetUseCaseBuild(usecaseName string) ([]domain.Component,
 	}
 
 	combos := GenerateConfigurations(all)
+	var results [][]domain.Component
 	for _, combo := range combos {
 		if matchesScenario(combo, rule) {
-			return combo, nil
+			results = append(results, combo)
+			if len(results) >= limit {
+				break
+			}
 		}
 	}
-	return nil, fmt.Errorf("no builds found for use case %q", usecaseName)
+
+	if len(results) == 0 {
+		return nil, fmt.Errorf("no builds found for use case %q", usecaseName)
+	}
+	return results, nil
 }
 
+// matchesScenario проверяет, подходит ли комбинация компонентов под правило ScenarioRule.
 // matchesScenario проверяет, подходит ли комбинация компонентов под правило ScenarioRule.
 func matchesScenario(combo []domain.Component, rule ScenarioRule) bool {
 	var cpu, mb, ram, gpu, psu, cs *domain.Component
@@ -293,7 +302,7 @@ func matchesScenario(combo []domain.Component, rule ScenarioRule) bool {
 			cs = &combo[i]
 		}
 	}
-	// Все ключевые компоненты должны присутствовать
+	// Все обязательные компоненты (кроме GPU) должны присутствовать
 	if cpu == nil || mb == nil || ram == nil || psu == nil || cs == nil {
 		return false
 	}
@@ -341,21 +350,21 @@ func matchesScenario(combo []domain.Component, rule ScenarioRule) bool {
 		}
 	}
 
-	// 5) GPU: память (мин/макс)
-	if rule.MinGPUMemory > 0 || rule.MaxGPUMemory > 0 {
+	// 5) GPU: требуем карту только если есть жесткое минимальное требование
+	if rule.MinGPUMemory > 0 {
 		if gpu == nil {
 			return false
 		}
 		specsGPU := parseSpecs(gpu.Specs)
-		if memRaw, ok := specsGPU["memory_gb"].(float64); ok {
-			mem := int(memRaw)
-			if rule.MinGPUMemory > 0 && mem < rule.MinGPUMemory {
-				return false
-			}
-			if rule.MaxGPUMemory > 0 && mem > rule.MaxGPUMemory {
-				return false
-			}
-		} else {
+		memRaw, ok := specsGPU["memory_gb"].(float64)
+		if !ok {
+			return false
+		}
+		mem := int(memRaw)
+		if mem < rule.MinGPUMemory {
+			return false
+		}
+		if rule.MaxGPUMemory > 0 && mem > rule.MaxGPUMemory {
 			return false
 		}
 	}
@@ -382,6 +391,13 @@ func matchesScenario(combo []domain.Component, rule ScenarioRule) bool {
 			}
 		}
 		if !supported {
+			return false
+		}
+	}
+
+	// 8) Case: корпус сам должен быть в разрешённом списке форм-факторов
+	if len(rule.CaseFormFactors) > 0 {
+		if caseForm, _ := specsCase["form_factor"].(string); !contains(rule.CaseFormFactors, caseForm) {
 			return false
 		}
 	}
