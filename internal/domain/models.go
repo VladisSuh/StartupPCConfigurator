@@ -44,9 +44,12 @@ type Component struct {
 }
 
 // Это то, что мы получаем в CreateConfigRequest/UpdateConfigRequest
+
 type ComponentRef struct {
-	Category string `json:"category"`
-	Name     string `json:"name"`
+	ID       int             `json:"id"`
+	Name     string          `json:"name"`
+	Category string          `json:"category"`
+	Specs    json.RawMessage `json:"specs"`
 }
 
 // Структура «Конфигурация» (сборка)
@@ -54,7 +57,7 @@ type Configuration struct {
 	ID         int            `db:"id"`
 	UserID     string         `db:"user_id"`
 	Name       string         `db:"name"`
-	Components []ComponentRef // не обязательно хранить здесь, т.к. в БД связь через configuration_components
+	Components []ComponentRef `json:"components"`
 	CreatedAt  time.Time      `db:"created_at"`
 	UpdatedAt  time.Time      `db:"updated_at"`
 	OwnerID    uuid.UUID

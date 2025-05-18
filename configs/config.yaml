@@ -166,50 +166,15 @@ paths:
           description: Ошибка валидации запроса
   /config/compatible:
     post:
-      tags: [ Configurator ]
+      tags:
+        - Configurator
       summary: Получить список совместимых компонентов
-      description: >
-        Возвращает компоненты указанной категории, совместимые с базовыми компонентами
-        из массива `bases`.
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/CompatibleRequest'
-            examples:
-              cpu_to_motherboard:
-                summary: Материнские платы, совместимые с CPU
-                value:
-                  category: motherboard
-                  bases:
-                    - category: cpu
-                      name: AMD Ryzen 5 5600X
-              ssd_to_mb:
-                summary: SSD, совместимые с материнской платой
-                value:
-                  category: ssd
-                  bases:
-                    - category: motherboard
-                      name: MSI B550 Tomahawk
-              psu_cpu_gpu:
-                summary: PSU, способные питать CPU и GPU
-                value:
-                  category: psu
-                  bases:
-                    - category: cpu
-                      name: AMD Ryzen 5 5600X
-                    - category: gpu
-                      name: NVIDIA GeForce RTX 3060
-              cooler_cpu_case:
-                summary: Кулер, совместимый с CPU и корпусом
-                value:
-                  category: cooler
-                  bases:
-                    - category: cpu
-                      name: AMD Ryzen 5 5600X
-                    - category: case
-                      name: NZXT H510
       responses:
         '200':
           description: Список совместимых компонентов
@@ -240,7 +205,7 @@ paths:
     get:
       tags:
         - Configurator
-      summary: Получить готовую сборку по сценарию
+      summary: Получить готовые сборки(10штук) по сценарию
       parameters:
         - in: path
           name: name
@@ -261,43 +226,6 @@ paths:
                       $ref: '#/components/schemas/Component'
         '404':
           description: Сценарий не найден
-
-  /config/usecase/{name}/generate:
-    post:
-      tags:
-        - Configurator
-      summary: Генерация сборок по сценарию и компонентам
-      parameters:
-        - in: path
-          name: name
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                components:
-                  type: array
-                  items:
-                    $ref: '#/components/schemas/ComponentRef'
-      responses:
-        '200':
-          description: Сгенерированные сборки
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  configs:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Configuration'
-        '400':
-          description: Неверный сценарий или ошибка запроса
 
   /config/newconfig:
     post:
@@ -598,6 +526,45 @@ paths:
         '404':
           description: Подписка не найдена
 components:
+  schemas:
+    CompatibleRequest:
+      type: object
+      required:
+        - category
+        - bases
+      properties:
+        category:
+          type: string
+          description: Категория искомых компонентов (например, "cpu", "ssd" и т.д.)
+        bases:
+          type: array
+          description: Базовые компоненты, от которых зависит совместимость
+          items:
+            type: object
+            required:
+              - category
+              - name
+            properties:
+              category:
+                type: string
+                description: Категория базового компонента
+              name:
+                type: string
+                description: Название базового компонента
+        brand:
+          type: string
+          description: Фильтр по бренду (необязательно)
+        usecase:
+          type: string
+          description: Фильтр по сценарию использования (необязательно)
+      example:
+        category: ssd
+        bases:
+          - category: motherboard
+            name: MSI B550 Tomahawk
+        brand: "Samsung"
+        usecase: "gaming"
+
   schemas:
     RegisterRequest:
       type: object
