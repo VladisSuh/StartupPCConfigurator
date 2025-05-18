@@ -1,0 +1,71 @@
+.card {
+    border-top: 1px solid rgba(255, 255, 255, .2);
+    border-bottom: 1px solid rgba(255, 255, 255, .2);
+    padding: 10px 40px ;
+    display: flex;
+    justify-content: space-between;
+    text-align: left;
+}
+
+
+.card__info {
+    margin-right: 30px;
+    width: 30%;
+}
+
+.card__title {
+    font-size: 16px;
+    line-height: 1.5;
+    margin-bottom: 10px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+
+.card__details {
+    cursor: pointer;
+    color: rgb(169, 75, 247);
+    font-weight: 700;
+}
+
+.card__price {
+    font-size: 16px;
+    font-weight: 700;
+    flex-shrink: 0;
+    margin: 0 10px;
+    padding-top: 12px;
+    width: 200px
+}
+
+.card__actions {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    width: 30%
+}
+
+.offersButton {
+/*     margin-top: 10px;
+ */    
+    padding: 10px 10px;
+    background: #1b1b1b;
+    color: rgb(255, 255, 255);
+    cursor: pointer;
+    border-radius: 0 !important;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    text-align: center;
+    /* background-color: #16003085; */
+    /* box-shadow:
+        inset 0 0 10px rgba(155, 33, 255, 0.623); */
+    border: 1px solid rgb(153, 42, 243);
+    width: 100%;
+    letter-spacing: 0.8px ;
+}
+
+.offersButton:hover {
+    box-shadow:
+        inset 0 0 30px rgba(159, 42, 255, 0.753);
+}

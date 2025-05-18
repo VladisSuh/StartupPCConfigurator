@@ -3,10 +3,11 @@ import CategoryTabs from "../CategoryTabs/CategoryTabs";
 import ComponentList from "../ComponentList/ComponentList";
 import styles from "./Configurator.module.css";
 import { SelectedBuild } from "../SelectedBuild/SelectedBuild";
-import { Component } from "../../types/index";
+import { CategoryType, Component } from "../../types/index";
+import { useConfig } from "../../ConfigContext";
 
 const Configurator = () => {
-    const [selectedCategory, setSelectedCategory] = useState<string>("cpu");
+    const [selectedCategory, setSelectedCategory] = useState<CategoryType>("cpu");
     const [selectedComponents, setSelectedComponents] = useState<Record<string, Component | null>>({
         cpu: null,
         gpu: null,
@@ -18,6 +19,10 @@ const Configurator = () => {
         case: null,
         psu: null,
     });
+
+    const { isLoading } = useConfig();
+
+    if (isLoading) return <div>Загрузка...</div>;
 
     return (
         <div className={styles.container}>
