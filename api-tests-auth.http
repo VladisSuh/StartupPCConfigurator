@@ -32,7 +32,7 @@ Content-Type: application/json
 #       "expires_at":   "..."
 #   }
 ################################################################################
-@access_token  = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImtyYXNpbmFfMjAwM0BtYWlsLnJ1IiwiZXhwIjoxNzQ3MzE1OTUzLCJ1c2VyX2lkIjoiYWQxYjNlYjEtOWYxYi00YjAyLWFjODgtNzM5NWY1MzQ3YzdiIn0.rXU0IUsScq__QuyfuvyriBf6XEy5jhR3d5RIcEdVibk
+@access_token  = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImtyYXNpbmFfMjAwM0BtYWlsLnJ1IiwiZXhwIjoxNzQ3NjUyMDE3LCJ1c2VyX2lkIjoiNWEzYWM5ZDUtMjAwMC00ZWUwLWE4YWUtOTdjNDU3ZDlmZDVlIn0.CzEsg67P4E0uag69trlH6XJ4RFCKcP5946UHO1tx4ag
 @refresh_token = 2
 
 ################################################################################
@@ -118,6 +118,17 @@ Authorization: Bearer {{access_token}}
 
 ### 11.2 поиск компонентов по названию
 GET {{config_host}}/config/components?search=AMD%20Ryzen%205%205600X
+Authorization: Bearer {{access_token}}
+
+### 11.3 получить компоненты по категории и бренду
+GET {{config_host}}/config/components?category=hdd&brand=Seagate
+
+### 11.4 получить компоненты по категории и сценарию сборки 
+GET {{config_host}}/config/components?category=motherboard&usecase=office
+
+
+### 12 бренды жёстких дисков
+GET {{config_host}}/config/brands?category=motherboard
 Authorization: Bearer {{access_token}}
 
 ################################################################################
@@ -314,8 +325,8 @@ GET {{config_host}}/config/usecases
 # Authorization: Bearer {{access_token}}  (необязательно)
 
 ################################################################################
-### 24. получить готовую сборку по сценарию
-GET {{config_host}}/config/usecase/office
+### 24. получить готовые сборки по сценарию
+GET {{config_host}}/config/usecase/gaming
 # Authorization: Bearer {{access_token}}  (необязательно)
 
 

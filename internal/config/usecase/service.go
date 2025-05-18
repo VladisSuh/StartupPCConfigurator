@@ -17,7 +17,7 @@ var (
 )
 
 type ConfigService interface {
-	FetchComponents(category, search string) ([]domain.Component, error)
+	FetchComponents(category, search, brand, usecase string) ([]domain.Component, error)
 	CreateConfiguration(userId uuid.UUID, name string, comps []domain.ComponentRef) (domain.Configuration, error)
 	FetchCompatibleComponentsMulti(category string, bases []domain.ComponentRef) ([]domain.Component, error)
 	FetchUserConfigurations(userId uuid.UUID) ([]domain.Configuration, error)
@@ -27,6 +27,7 @@ type ConfigService interface {
 	GetUseCaseBuild(usecaseName string, limit int) ([][]domain.Component, error)
 	GenerateUseCaseConfigs(usecaseName string, refs []domain.ComponentRef) ([][]domain.Component, error)
 	ListUseCases() ([]domain.UseCase, error)
+	ListBrands(category string) ([]string, error)
 }
 
 type configService struct {
@@ -37,8 +38,59 @@ func NewConfigService(r repository.ConfigRepository) ConfigService {
 	return &configService{repo: r}
 }
 
-func (s *configService) FetchComponents(category, search string) ([]domain.Component, error) {
-	return s.repo.GetComponents(category, search)
+// service.go
+func (s *configService) FetchComponents(
+	category, search, brand, usecase string,
+) ([]domain.Component, error) {
+	// 1. Получили «сырые» данные по категории/search/brand
+	comps, err := s.repo.GetComponents(category, search, brand)
+	if err != nil {
+		return nil, err
+	}
+
+	// 2. Если сценарий не указан — отдаем всё
+	if usecase == "" {
+		return comps, nil
+	}
+	rule, ok := ScenarioRules[usecase]
+	if !ok {
+		return nil, fmt.Errorf("unknown usecase %q", usecase)
+	}
+
+	// 3. Фильтруем ровно по той части правила, что относится к category
+	var out []domain.Component
+	for _, c := range comps {
+		switch strings.ToLower(c.Category) {
+		case "cpu":
+			if cpuMatches(c, rule) {
+				out = append(out, c)
+			}
+		case "motherboard":
+			if mbMatches(c, rule) {
+				out = append(out, c)
+			}
+		case "ram":
+			if ramMatches(c, rule) {
+				out = append(out, c)
+			}
+		case "gpu":
+			if gpuMatches(c, rule) {
+				out = append(out, c)
+			}
+		case "psu":
+			if psuMatches(c, rule) {
+				out = append(out, c)
+			}
+		case "case":
+			if caseMatches(c, rule) {
+				out = append(out, c)
+			}
+		default:
+			// остальные категории — без фильтрации по сценарию
+			out = append(out, c)
+		}
+	}
+	return out, nil
 }
 
 func (s *configService) FetchCompatibleComponentsMulti(
@@ -216,7 +268,7 @@ func (s *configService) GenerateConfigurations(refs []domain.ComponentRef) ([][]
 	}
 
 	// 2) Подгружаем все компоненты из репозитория
-	all, err := s.repo.GetComponents("", "")
+	all, err := s.repo.GetComponents("", "", "")
 	if err != nil {
 		return nil, fmt.Errorf("failed to load components: %w", err)
 	}
@@ -258,7 +310,7 @@ func (s *configService) GetUseCaseBuild(usecaseName string, limit int) ([][]doma
 		return nil, fmt.Errorf("unknown use case %q", usecaseName)
 	}
 
-	all, err := s.repo.GetComponents("", "")
+	all, err := s.repo.GetComponents("", "", "")
 	if err != nil {
 		return nil, fmt.Errorf("failed to load components: %w", err)
 	}
@@ -280,7 +332,12 @@ func (s *configService) GetUseCaseBuild(usecaseName string, limit int) ([][]doma
 	return results, nil
 }
 
-// matchesScenario проверяет, подходит ли комбинация компонентов под правило ScenarioRule.
+var caseSupportedMap = map[string][]string{
+	"ATX":       {"ATX", "Micro-ATX", "Mini-ITX"},
+	"Micro-ATX": {"Micro-ATX", "Mini-ITX"},
+	"Mini-ITX":  {"Mini-ITX"},
+}
+
 // matchesScenario проверяет, подходит ли комбинация компонентов под правило ScenarioRule.
 func matchesScenario(combo []domain.Component, rule ScenarioRule) bool {
 	var cpu, mb, ram, gpu, psu, cs *domain.Component
@@ -380,19 +437,16 @@ func matchesScenario(combo []domain.Component, rule ScenarioRule) bool {
 		}
 	}
 
-	// 7) Case ↔ Motherboard: проверяем, что форм-фактор материнской платы поддерживается корпусом
-	if arr, ok := specsCase["max_motherboard_form_factors"].([]interface{}); ok {
-		mfMB, _ := specsMB["form_factor"].(string)
-		supported := false
-		for _, v := range arr {
-			if s, ok := v.(string); ok && strings.EqualFold(s, mfMB) {
-				supported = true
-				break
-			}
-		}
-		if !supported {
-			return false
-		}
+	// 7) Case ↔ MB: поддержка форм-факторов без изменения JSON
+	caseForm, _ := specsCase["form_factor"].(string) // например "ATX"
+	mbForm, _ := specsMB["form_factor"].(string)     // например "Micro-ATX"
+	allowed, ok := caseSupportedMap[strings.ToUpper(caseForm)]
+	if !ok {
+		// если вдруг корпус нестандартный — отбраковываем
+		return false
+	}
+	if !contains(allowed, mbForm) {
+		return false
 	}
 
 	// 8) Case: корпус сам должен быть в разрешённом списке форм-факторов
@@ -438,7 +492,7 @@ func (s *configService) GenerateUseCaseConfigs(usecaseName string, refs []domain
 		selected = append(selected, comp)
 	}
 	// 3) Загружаем всё и получаем все совместимые комбо
-	all, err := s.repo.GetComponents("", "")
+	all, err := s.repo.GetComponents("", "", "")
 	if err != nil {
 		return nil, err
 	}
@@ -473,4 +527,105 @@ func containsAll(combo, want []domain.Component) bool {
 // ListUseCases возвращает все сценарии из БД
 func (s *configService) ListUseCases() ([]domain.UseCase, error) {
 	return s.repo.GetUseCases()
+}
+
+func (s *configService) ListBrands(category string) ([]string, error) {
+	if category == "" {
+		return nil, errors.New("category required")
+	}
+	return s.repo.GetBrandsByCategory(category)
+}
+
+func cpuMatches(c domain.Component, rule ScenarioRule) bool {
+	specs := parseSpecs(c.Specs)
+	// 1) socket
+	sock, _ := specs["socket"].(string)
+	if !contains(rule.CPUSocketWhitelist, sock) {
+		return false
+	}
+	// 2) TDP
+	if tdpRaw, ok := specs["tdp"].(float64); ok {
+		tdp := int(tdpRaw)
+		if rule.MinCPUTDP > 0 && tdp < rule.MinCPUTDP {
+			return false
+		}
+		if rule.MaxCPUTDP > 0 && tdp > rule.MaxCPUTDP {
+			return false
+		}
+	}
+	return true
+}
+
+func mbMatches(c domain.Component, rule ScenarioRule) bool {
+	specs := parseSpecs(c.Specs)
+	// RAM-type согласовать
+	if rule.RAMType != "" {
+		if mt, _ := specs["ram_type"].(string); mt != rule.RAMType {
+			return false
+		}
+	}
+	// форм-фактор MB — должен поддерживаться корпусом, но тут мы не знаем корпус,
+	// поэтому только проверим, что MB форм-фактор входит в allowed-list корпуса из правила
+	// (опционально — если хотите)
+	return true
+}
+
+func ramMatches(c domain.Component, rule ScenarioRule) bool {
+	specs := parseSpecs(c.Specs)
+	if rt, _ := specs["ram_type"].(string); rt != rule.RAMType {
+		return false
+	}
+	if capRaw, ok := specs["capacity"].(float64); ok {
+		cap := int(capRaw)
+		if rule.MinRAM > 0 && cap < rule.MinRAM {
+			return false
+		}
+		if rule.MaxRAM > 0 && cap > rule.MaxRAM {
+			return false
+		}
+	}
+	return true
+}
+
+func gpuMatches(c domain.Component, rule ScenarioRule) bool {
+	// GPU необязателен, но если MinGPUMemory>0 — проверяем
+	if rule.MinGPUMemory == 0 {
+		return true
+	}
+	specs := parseSpecs(c.Specs)
+	if memRaw, ok := specs["memory_gb"].(float64); ok {
+		mem := int(memRaw)
+		if mem < rule.MinGPUMemory {
+			return false
+		}
+		if rule.MaxGPUMemory > 0 && mem > rule.MaxGPUMemory {
+			return false
+		}
+		return true
+	}
+	return false
+}
+
+func psuMatches(c domain.Component, rule ScenarioRule) bool {
+	specs := parseSpecs(c.Specs)
+	if powRaw, ok := specs["power"].(float64); ok {
+		p := int(powRaw)
+		if rule.MinPSUPower > 0 && p < rule.MinPSUPower {
+			return false
+		}
+		if rule.MaxPSUPower > 0 && p > rule.MaxPSUPower {
+			return false
+		}
+	}
+	return true
+}
+
+func caseMatches(c domain.Component, rule ScenarioRule) bool {
+	specs := parseSpecs(c.Specs)
+	cf, _ := specs["form_factor"].(string)
+	// 1) корпус сам должен быть разрешён в сценарии
+	if len(rule.CaseFormFactors) > 0 && !contains(rule.CaseFormFactors, cf) {
+		return false
+	}
+	return true
 }

@@ -14,7 +14,7 @@ import (
 
 // Repository интерфейс
 type ConfigRepository interface {
-	GetComponents(category, search string) ([]domain.Component, error)
+	GetComponents(category, search, brand string) ([]domain.Component, error)
 	GetCompatibleComponents(filter domain.CompatibilityFilter) ([]domain.Component, error)
 	CreateConfiguration(userId uuid.UUID, name string, components []domain.Component) (domain.Configuration, error)
 	UpdateConfiguration(userId uuid.UUID, configId, name string, comps []domain.Component) (domain.Configuration, error)
@@ -23,6 +23,7 @@ type ConfigRepository interface {
 	GetComponentByID(category, id string) (domain.Component, error)
 	GetComponentByName(category, name string) (domain.Component, error)
 	GetUseCases() ([]domain.UseCase, error)
+	GetBrandsByCategory(category string) ([]string, error)
 }
 
 // Реализация
@@ -107,56 +108,49 @@ func NewConfigRepository(db *sql.DB) ConfigRepository {
 
 // Пример метода GetComponents
 // Реализация метода GetComponents
-func (r *configRepository) GetComponents(category, search string) ([]domain.Component, error) {
-	// SQL-запрос; учтите, что если это PostgreSQL — придётся использовать $1, $2 вместо ?
-	query := `
-    SELECT id, name, category, brand, specs, created_at, updated_at
-    FROM components
-    WHERE 1=1
-`
+// старый метод замените на:
+func (r *configRepository) GetComponents(category, search, brand string) ([]domain.Component, error) {
 	var (
 		args  []interface{}
-		index int = 1 // счётчик placeholder'ов
+		where []string
+		idx   = 1
 	)
-
 	if category != "" {
-		category = strings.ToLower(category)
-		query += fmt.Sprintf(" AND LOWER(category) = $%d", index)
+		where = append(where, fmt.Sprintf("category = $%d", idx))
 		args = append(args, category)
-		index++
+		idx++
 	}
-
 	if search != "" {
-		search = strings.ToLower(search)
-		query += fmt.Sprintf(" AND (LOWER(name) LIKE $%d OR LOWER(brand) LIKE $%d)", index, index+1)
-		searchLike := "%" + search + "%"
-		args = append(args, searchLike, searchLike)
-		index += 2
+		where = append(where, fmt.Sprintf("LOWER(name) ILIKE LOWER($%d)", idx))
+		args = append(args, "%"+search+"%")
+		idx++
+	}
+	if brand != "" {
+		where = append(where, fmt.Sprintf("LOWER(brand) = LOWER($%d)", idx))
+		args = append(args, brand)
+		idx++
 	}
 
-	rows, err := r.db.Query(query, args...)
+	q := "SELECT id, name, category, brand, specs FROM components"
+	if len(where) > 0 {
+		q += " WHERE " + strings.Join(where, " AND ")
+	}
+
+	rows, err := r.db.Query(q, args...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var result []domain.Component
+	var out []domain.Component
 	for rows.Next() {
 		var c domain.Component
-		if err := rows.Scan(
-			&c.ID,
-			&c.Name,
-			&c.Category,
-			&c.Brand,
-			&c.Specs,
-			&c.CreatedAt,
-			&c.UpdatedAt,
-		); err != nil {
+		if err := rows.Scan(&c.ID, &c.Name, &c.Category, &c.Brand, &c.Specs); err != nil {
 			return nil, err
 		}
-		result = append(result, c)
+		out = append(out, c)
 	}
-	return result, nil
+	return out, nil
 }
 
 func (r *configRepository) CreateConfiguration(
@@ -480,4 +474,27 @@ func (r *configRepository) GetUseCases() ([]domain.UseCase, error) {
 		out = append(out, uc)
 	}
 	return out, nil
+}
+
+// internal/config/repository/pg/repository.go
+func (r *configRepository) GetBrandsByCategory(cat string) ([]string, error) {
+	const q = `SELECT DISTINCT brand
+               FROM components
+               WHERE category = $1
+               ORDER BY brand`
+	rows, err := r.db.Query(q, cat)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var brands []string
+	for rows.Next() {
+		var b string
+		if err := rows.Scan(&b); err != nil {
+			return nil, err
+		}
+		brands = append(brands, b)
+	}
+	return brands, nil
 }

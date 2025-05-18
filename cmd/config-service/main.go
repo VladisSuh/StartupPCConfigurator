@@ -52,6 +52,7 @@ func main() {
 	r.GET("/usecase/:name", h.GetUseCaseBuild)
 	r.POST("/generate", h.GenerateConfigs)
 	r.POST("/usecase/:name/generate", h.GenerateUseCaseConfigs)
+	r.GET("/brands", h.GetBrands)
 
 	// 7. Защищённые ручки
 	api := r.Group("/", auth)

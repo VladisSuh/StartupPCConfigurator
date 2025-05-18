@@ -66,6 +66,7 @@ func main() {
 		c.Request.URL.Path = "/usecase/" + c.Param("name") + "/generate"
 		proxyKeepPath(configURL)(c)
 	})
+	r.GET("/config/brands", reverseProxyPath(configURL, "/brands"))
 
 	// ---------- CONFIG – защищённые (JWT) ----------------------------------
 	cfgSec := r.Group("/config", middleware.AuthMiddleware(jwtSecret))
