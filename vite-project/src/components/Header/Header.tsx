@@ -1,11 +1,12 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import styles from "./Header.module.css";
 import { Modal } from "../Modal/Modal";
 import Register from "../Register/component";
 import Login from "../Login/component";
 import { useAuth } from "../../AuthContext";
+import { Page } from "../../types";
 
-const Header = () => {
+const Header = ({ setCurrentPage, currentPage }: { setCurrentPage: (page: Page) => void; currentPage: Page }) => {
     const [isVisible, setIsVisible] = useState(false);
     const [openComponent, setOpenComponent] = useState('login');
     const { logout, isAuthenticated } = useAuth();
@@ -13,6 +14,7 @@ const Header = () => {
     const handleIconClick = () => {
         console.log('Icon clicked');
         if (isAuthenticated) {
+            setCurrentPage('account')
             console.log('Личный кабинет');
         } else {
             setIsVisible(true);
@@ -23,13 +25,28 @@ const Header = () => {
         <div className={styles.header}>
             <div className={styles.headerContent}>
                 <div className={styles.logo}>UConf</div>
+
+                <div className={styles.navigation}>
+                    <button
+                        className={`${styles.navButton} ${currentPage === 'configurator' ? styles.active : ''}`}
+                        onClick={() => setCurrentPage('configurator')}
+                    >
+                        Конфигуратор
+                    </button>
+                </div>
+
                 <div>
                     <img
-                        src="src/assets/user-icon.png"
-                        className={styles.icon}
+                        src={
+                            currentPage === 'account'
+                                ? 'src/assets/user-icon-active.svg'
+                                : 'src/assets/user-icon-white.svg'
+                        }
                         alt="Аккаунт"
+                        className={styles.icon}
                         onClick={handleIconClick}
                     />
+                    
 
                     {isAuthenticated && (
                         <img

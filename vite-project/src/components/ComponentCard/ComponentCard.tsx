@@ -18,7 +18,7 @@ export const ComponentCard = ({ component, onSelect, selected }: ComponentCardPr
   const [isDetailsVisible, setIsDetailsVisible] = useState(false);
   const [showLoginMessage, setShowLoginMessage] = useState(false);
 
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, getToken } = useAuth();
   const [isVisible, setIsVisible] = useState(false);
   const [openComponent, setOpenComponent] = useState('login');
 
@@ -26,45 +26,49 @@ export const ComponentCard = ({ component, onSelect, selected }: ComponentCardPr
   useEffect(() => {
     const fetchMinPrice = async () => {
       try {
-        setIsLoading(true);
-        const token = localStorage.getItem('authToken');
-
+        //setIsLoading(true);
         const response = await fetch(
-          `http://localhost:8080/offers?componentId=${component.id}&sort=priceAsc`,
+          `http://localhost:8080/offers/min?componentId=${component.id}`,
           {
+            method: 'GET',
             headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
             }
           }
         );
 
-        const data = await response.json();
-        console.log('цены', data);
+        if (!response.ok) {
+          throw new Error('Ошибка при загрузке минимальной цены');
+        }
 
-        if (data && data.length > 0) {
-          setMinPrice(data[0].price);
+        const data = await response.json();
+        console.log('Минимальная цена:', data);
+
+        if (data && typeof data.minPrice === 'number') {
+          setMinPrice(data.minPrice);
         }
       } catch (err) {
-        setError('Не удалось загрузить цены');
+        setError('Не удалось загрузить минимальную цену');
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchMinPrice();
+
   }, [component.id]);
 
   const fetchOffers = async () => {
     try {
       setIsLoading(true);
       setError(null);
-
-      const token = localStorage.getItem('authToken');
-
-      if (!token) {
+      
+      if (!isAuthenticated) {
         throw new Error('Требуется авторизация');
       }
+
+      const token = getToken();
 
       const response = await fetch(
         `http://localhost:8080/offers?componentId=${component.id}&sort=priceAsc`,
@@ -184,7 +188,7 @@ export const ComponentCard = ({ component, onSelect, selected }: ComponentCardPr
           <Register
             setOpenComponent={(component) => {
               setOpenComponent(component);
-              setShowLoginMessage(false); 
+              setShowLoginMessage(false);
             }}
             onClose={() => setIsVisible(false)}
           />
@@ -192,7 +196,7 @@ export const ComponentCard = ({ component, onSelect, selected }: ComponentCardPr
           <Login
             setOpenComponent={(component) => {
               setOpenComponent(component);
-              setShowLoginMessage(false); 
+              setShowLoginMessage(false);
             }}
             onClose={() => setIsVisible(false)}
             message={showLoginMessage ? 'Посмотреть предложения можно после авторизации' : undefined}

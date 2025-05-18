@@ -106,14 +106,11 @@ export interface CategoryTabsProps {
     onSelect: (category: CategoryType) => void;
 }
 
-
-
 export interface ComponentListProps {
-    selectedCategory: string;
+    selectedCategory: CategoryType;
     selectedComponents: Record<string, Component | null>;
     setSelectedComponents: React.Dispatch<React.SetStateAction<Record<string, Component | null>>>;
 }
-
 
 export interface ComponentCardProps {
     component: Component;
@@ -131,3 +128,67 @@ export interface Offer {
 export interface OffersListProps {
     offers: Offer[];
 }
+
+export type Page = 'configurator' | 'account';
+
+
+export type ResponseComponent = {
+    category: string;
+    id: string;
+    name: string;
+    specs: Record<string, string>;
+};
+
+export type Configuration = {
+    ID: string;
+    Name: string;
+    OwnerId: string;
+    components: ResponseComponent[];
+    CreatedAt: string;
+    UpdatedAt: string;
+};
+
+export type Configurations = Configuration[];
+
+
+
+export type UsecaseType =
+    | 'all'
+    | 'office'
+    | 'htpc'
+    | 'gaming'
+    | 'streamer'
+    | 'design'
+    | 'video'
+    | 'cad'
+    | 'dev'
+    | 'enthusiast'
+    | 'nas';
+
+export const Usecases: UsecaseType[] = [
+    'all',
+    "office",
+    "htpc",
+    "gaming",
+    "streamer",
+    "design",
+    "video",
+    "cad",
+    "dev",
+    "enthusiast",
+    "nas"
+];
+
+export const UsecaseLabels: Record<UsecaseType, string> = {
+    all: "Все сценарии",
+    office: "Офис",
+    htpc: "Медиаплеер",
+    gaming: "Игры",
+    streamer: "Стриминг",
+    design: "Дизайн",
+    video: "Видеомонтаж",
+    cad: "3D-моделирование",
+    dev: "Разработка",
+    enthusiast: "Топовая сборка",
+    nas: "Домашний сервер",
+};

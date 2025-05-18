@@ -1,0 +1,18 @@
+.container {
+    margin: 0 auto;
+    background-color: #1b1b1b;
+    display: block;
+    width: 70%;
+}
+
+.title{
+    text-align: center;
+    padding: 10px 0 0;
+}
+
+.configTitle{
+    /* text-align: center; */
+    padding: 30px 10px 10px;
+    font-size: 18px;
+    font-weight: 600    ;
+}
