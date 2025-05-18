@@ -13,7 +13,6 @@ import (
 )
 
 // / Создаём структуру, отражающую тело запроса в /config/newconfig.
-// Это может соответствовать вашей OpenAPI (CreateConfigRequest).
 type CreateConfigRequest struct {
 	Name       string         `json:"name" binding:"required"`
 	Components []ComponentRef `json:"components" binding:"required"`
@@ -109,18 +108,26 @@ func (h *ConfigHandler) UpdateConfig(c *gin.Context) {
 
 // Новый тип запроса под POST /config/compatible
 type CompatMultiRequest struct {
-	Category string                `json:"category" binding:"required"`
+	Category string                `json:"category" binding:"required,oneof=cpu gpu motherboard ram hdd ssd cooler case psu"`
 	Bases    []domain.ComponentRef `json:"bases"    binding:"required"`
+	Brand    *string               `json:"brand,omitempty"`   // новый
+	Usecase  *string               `json:"usecase,omitempty"` // новый
 }
 
 // GetCompatibleComponentsMulti обрабатывает POST /config/compatible
+// config/handlers.go
 func (h *ConfigHandler) GetCompatibleComponentsMulti(c *gin.Context) {
 	var req CompatMultiRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
 		return
 	}
-	comps, err := h.service.FetchCompatibleComponentsMulti(req.Category, req.Bases)
+	comps, err := h.service.FetchCompatibleComponentsMulti(
+		req.Category,
+		req.Bases,
+		req.Brand,   // ← передаём дальше
+		req.Usecase, // ← и сценарий
+	)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

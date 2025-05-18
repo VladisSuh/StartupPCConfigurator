@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 )
 
 // Repository интерфейс
@@ -24,6 +25,9 @@ type ConfigRepository interface {
 	GetComponentByName(category, name string) (domain.Component, error)
 	GetUseCases() ([]domain.UseCase, error)
 	GetBrandsByCategory(category string) ([]string, error)
+	GetComponentsByFilters(category string, brand *string) ([]domain.Component, error)
+	GetComponentsByCategory(category string) ([]domain.Component, error)
+	FilterPoolByCompatibility(pool []domain.Component, filter domain.CompatibilityFilter) ([]domain.Component, error)
 }
 
 // Реализация
@@ -336,7 +340,7 @@ func (r *configRepository) GetUserConfigurations(userId uuid.UUID) ([]domain.Con
 		}
 
 		compQuery := `
-		SELECT c.name, c.category
+		SELECT c.name, c.category, c.id, c.specs
 		FROM configuration_components cc
 		JOIN components c ON cc.component_id = c.id
 		WHERE cc.config_id = $1
@@ -347,7 +351,7 @@ func (r *configRepository) GetUserConfigurations(userId uuid.UUID) ([]domain.Con
 		}
 		for compRows.Next() {
 			var ref domain.ComponentRef
-			if err := compRows.Scan(&ref.Name, &ref.Category); err != nil {
+			if err := compRows.Scan(&ref.Name, &ref.Category, &ref.ID, &ref.Specs); err != nil {
 				compRows.Close()
 				return nil, err
 			}
@@ -497,4 +501,125 @@ func (r *configRepository) GetBrandsByCategory(cat string) ([]string, error) {
 		brands = append(brands, b)
 	}
 	return brands, nil
+}
+
+// allowedByCategory опеределяет, какие поля specs учитываются для каждой категории при фильтрации.
+var allowedByCategory = map[string][]string{
+	"motherboard": {"socket", "ram_type", "form_factor", "max_memory_gb", "pcie_version", "m2_slots", "sata_ports"},
+	"case":        {"form_factor", "gpu_max_length", "cooler_max_height", "max_psu_length", "psu_form_factor"},
+	"psu":         {"power", "power_required", "modular", "efficiency", "form_factor"},
+	"gpu":         {"interface", "power_draw", "length_mm", "height_mm"},
+	"ram":         {"ram_type", "capacity", "frequency", "modules", "voltage"},
+	"ssd":         {"interface", "form_factor", "capacity_gb", "m2_key", "max_throughput"},
+	"hdd":         {"interface", "form_factor", "capacity_gb", "rpm"},
+}
+
+// GetComponentsByFilters возвращает компоненты указанной категории с дополнительным фильтром brand.
+func (r *configRepository) GetComponentsByFilters(
+	category string,
+	brand *string,
+) ([]domain.Component, error) {
+	query := `
+      SELECT id, name, category, brand, specs, created_at, updated_at
+        FROM components
+       WHERE LOWER(category)=LOWER($1)
+    `
+	args := []interface{}{category}
+	idx := 2
+
+	if brand != nil {
+		query += fmt.Sprintf(" AND LOWER(brand)=LOWER($%d)", idx)
+		args = append(args, strings.ToLower(*brand))
+		idx++
+	}
+
+	query += " ORDER BY name ASC"
+
+	rows, err := r.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []domain.Component
+	for rows.Next() {
+		var c domain.Component
+		if err := rows.Scan(
+			&c.ID, &c.Name, &c.Category, &c.Brand,
+			&c.Specs, &c.CreatedAt, &c.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		out = append(out, c)
+	}
+	return out, nil
+}
+
+// GetComponentsByCategory возвращает все компоненты заданной категории.
+func (r *configRepository) GetComponentsByCategory(
+	category string,
+) ([]domain.Component, error) {
+	return r.GetComponentsByFilters(category, nil)
+}
+
+// FilterPoolByCompatibility фильтрует переданный пул components по JSONB-спецификациям из filter.Specs.
+func (r *configRepository) FilterPoolByCompatibility(
+	pool []domain.Component,
+	filter domain.CompatibilityFilter,
+) ([]domain.Component, error) {
+	// Собираем массив
+	ids := make([]int, len(pool))
+	for i, c := range pool {
+		ids[i] = c.ID
+	}
+
+	// Базовый запрос по переданному пулу
+	query := `
+      SELECT id, name, category, brand, specs, created_at, updated_at
+        FROM components
+       WHERE id = ANY($1)
+    `
+	args := []interface{}{pq.Array(ids)}
+	idx := 2
+
+	// Добавляем JSONB-условия
+	allowed := allowedByCategory[strings.ToLower(filter.Category)]
+	allowedSet := make(map[string]bool, len(allowed))
+	for _, k := range allowed {
+		allowedSet[k] = true
+	}
+	for key, val := range filter.Specs {
+		if !allowedSet[key] {
+			continue
+		}
+		switch v := val.(type) {
+		case string:
+			query += fmt.Sprintf(" AND LOWER(specs->>'%s') = LOWER($%d)", key, idx)
+			args = append(args, v)
+			idx++
+		case float64:
+			query += fmt.Sprintf(" AND (specs->>'%s')::float >= $%d", key, idx)
+			args = append(args, v)
+			idx++
+		}
+	}
+
+	rows, err := r.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []domain.Component
+	for rows.Next() {
+		var c domain.Component
+		if err := rows.Scan(
+			&c.ID, &c.Name, &c.Category, &c.Brand,
+			&c.Specs, &c.CreatedAt, &c.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		result = append(result, c)
+	}
+	return result, nil
 }

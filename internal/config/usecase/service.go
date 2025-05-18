@@ -19,7 +19,7 @@ var (
 type ConfigService interface {
 	FetchComponents(category, search, brand, usecase string) ([]domain.Component, error)
 	CreateConfiguration(userId uuid.UUID, name string, comps []domain.ComponentRef) (domain.Configuration, error)
-	FetchCompatibleComponentsMulti(category string, bases []domain.ComponentRef) ([]domain.Component, error)
+	FetchCompatibleComponentsMulti(category string, bases []domain.ComponentRef, brand *string, usecase *string) ([]domain.Component, error)
 	FetchUserConfigurations(userId uuid.UUID) ([]domain.Configuration, error)
 	UpdateConfiguration(userId uuid.UUID, configId string, name string, comps []domain.ComponentRef) (domain.Configuration, error)
 	DeleteConfiguration(userId uuid.UUID, configId string) error
@@ -85,6 +85,11 @@ func (s *configService) FetchComponents(
 			if caseMatches(c, rule) {
 				out = append(out, c)
 			}
+		case "ssd":
+			if ssdMatches(c, rule) {
+				out = append(out, c)
+			}
+
 		default:
 			// остальные категории — без фильтрации по сценарию
 			out = append(out, c)
@@ -96,8 +101,67 @@ func (s *configService) FetchComponents(
 func (s *configService) FetchCompatibleComponentsMulti(
 	category string,
 	bases []domain.ComponentRef,
+	brand *string,
+	usecase *string,
 ) ([]domain.Component, error) {
-	// 1) Если ищем кулеры — сразу отфильтруем bases так, чтобы в нём были только CPU и Case
+	// 1) Получаем «пул» кандидатов по category + опционально brand
+	var candidates []domain.Component
+	var err error
+	if brand != nil {
+		candidates, err = s.repo.GetComponentsByFilters(category, brand)
+	} else {
+		candidates, err = s.repo.GetComponentsByCategory(category)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	// 2) Применяем фильтрацию по сценарию, если он указан
+	if usecase != nil && *usecase != "" {
+		rule, ok := ScenarioRules[*usecase]
+		if !ok {
+			return nil, fmt.Errorf("unknown usecase %q", *usecase)
+		}
+		var filtered []domain.Component
+		for _, comp := range candidates {
+			switch strings.ToLower(comp.Category) {
+			case "cpu":
+				if cpuMatches(comp, rule) {
+					filtered = append(filtered, comp)
+				}
+			case "motherboard":
+				if mbMatches(comp, rule) {
+					filtered = append(filtered, comp)
+				}
+			case "ram":
+				if ramMatches(comp, rule) {
+					filtered = append(filtered, comp)
+				}
+			case "gpu":
+				if gpuMatches(comp, rule) {
+					filtered = append(filtered, comp)
+				}
+			case "psu":
+				if psuMatches(comp, rule) {
+					filtered = append(filtered, comp)
+				}
+			case "case":
+				if caseMatches(comp, rule) {
+					filtered = append(filtered, comp)
+				}
+			case "ssd":
+				if ssdMatches(comp, rule) {
+					filtered = append(filtered, comp)
+				}
+
+			default:
+				filtered = append(filtered, comp)
+			}
+		}
+		candidates = filtered
+	}
+
+	// 2) Специальная логика для кулеров
 	if strings.EqualFold(category, "cooler") {
 		var filtered []domain.ComponentRef
 		for _, ref := range bases {
@@ -109,10 +173,9 @@ func (s *configService) FetchCompatibleComponentsMulti(
 		bases = filtered
 	}
 
-	// 2) Собираем все specs в одну карту и считаем нагрузку на PSU
+	// 3) Собираем merged-спецификацию и totalDraw для PSU
 	merged := make(map[string]interface{})
 	var totalDraw float64
-
 	for _, ref := range bases {
 		base, err := s.repo.GetComponentByName(ref.Category, ref.Name)
 		if err != nil {
@@ -122,13 +185,9 @@ func (s *configService) FetchCompatibleComponentsMulti(
 		if err := json.Unmarshal(base.Specs, &m); err != nil {
 			return nil, fmt.Errorf("invalid specs for %s/%s: %w", ref.Category, ref.Name, err)
 		}
-
-		// мёржим всё
 		for k, v := range m {
 			merged[k] = v
 		}
-
-		// если целевая категория PSU — аккумулируем power_draw от CPU и GPU
 		if strings.EqualFold(category, "psu") &&
 			(strings.EqualFold(ref.Category, "cpu") || strings.EqualFold(ref.Category, "gpu")) {
 			if d, ok := m["power_draw"].(float64); ok {
@@ -137,40 +196,30 @@ func (s *configService) FetchCompatibleComponentsMulti(
 		}
 	}
 
-	// 3) Преобразования под каждую категорию
+	// 4) Адаптируем merged-спецификацию под целевую категорию
 	switch strings.ToLower(category) {
 	case "case":
 		if h, ok := merged["cooler_height"]; ok {
 			merged["cooler_max_height"] = h
 		}
-
 	case "gpu":
 		if v, ok := merged["pcie_version"]; ok {
 			merged["interface"] = v
 		}
-
 	case "psu":
-		// только требуемая мощность
-		merged = map[string]interface{}{
-			"power": totalDraw + 150,
-		}
-
+		merged = map[string]interface{}{"power": totalDraw + 150}
 	case "ssd":
-		// интерфейс: NVMe или SATA
 		if v, ok := merged["pcie_version"]; ok {
 			merged["interface"] = v
 		} else if _, ok := merged["sata_ports"]; ok {
 			merged["interface"] = "SATA III"
 		}
-		// форм-фактор: M.2 или 2.5"
 		if slots, ok := merged["m2_slots"].(float64); ok && slots >= 1 {
 			merged["form_factor"] = "M.2"
 		} else {
 			merged["form_factor"] = "2.5"
 		}
-
 	case "cooler":
-		// собираем только socket + height_mm
 		height, _ := merged["cooler_max_height"]
 		socket, _ := merged["socket"]
 		merged = map[string]interface{}{
@@ -179,12 +228,12 @@ func (s *configService) FetchCompatibleComponentsMulti(
 		}
 	}
 
-	// 4) Формируем и отправляем фильтр
+	// 5) Фильтруем наш пул по совместимости с учётом merged specs
 	filter := domain.CompatibilityFilter{
 		Category: category,
 		Specs:    merged,
 	}
-	return s.repo.GetCompatibleComponents(filter)
+	return s.repo.FilterPoolByCompatibility(candidates, filter)
 }
 
 func (s *configService) CreateConfiguration(userId uuid.UUID, name string, refs []domain.ComponentRef) (domain.Configuration, error) {
@@ -628,4 +677,23 @@ func caseMatches(c domain.Component, rule ScenarioRule) bool {
 		return false
 	}
 	return true
+}
+
+func ssdMatches(c domain.Component, rule ScenarioRule) bool {
+	var specs struct {
+		MaxThroughput float64 `json:"max_throughput"`
+		FormFactor    string  `json:"form_factor"`
+	}
+	if err := json.Unmarshal(c.Specs, &specs); err != nil {
+		return false
+	}
+	if specs.MaxThroughput < float64(rule.MinSSDThroughput) {
+		return false
+	}
+	for _, ff := range rule.SSDFormFactors {
+		if strings.EqualFold(specs.FormFactor, ff) {
+			return true
+		}
+	}
+	return false
 }
