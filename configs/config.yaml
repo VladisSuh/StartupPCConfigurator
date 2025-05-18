@@ -99,6 +99,71 @@ paths:
         '401':
           description: Не авторизован
 
+  /config/components:
+    get:
+      tags: [ Configurator ]
+      summary: Получить список компонентов
+      description: >
+        Возвращает компоненты указанной категории.  
+        Дополнительно можно отфильтровать по бренду (`brand`) или по сценарию
+        сборки (`usecase`).  
+        Если указаны оба фильтра, применяется **AND**-логика.
+      parameters:
+        - in: query
+          name: category
+          required: true
+          schema:
+            type: string
+            enum: [ cpu, gpu, motherboard, ram, hdd, ssd, cooler, case, psu ]
+          description: Категория компонента
+        - in: query
+          name: brand
+          required: false
+          schema:
+            type: string
+          description: Название бренда (например «Seagate»)
+        - in: query
+          name: usecase
+          required: false
+          schema:
+            type: string
+          description: Сценарий сборки (например «office», «gaming»)
+      responses:
+        '200':
+          description: Массив компонентов, удовлетворяющих фильтрам
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Component'
+        '400':
+          description: Ошибка валидации запроса
+  /config/brands:
+    get:
+      tags: [ Configurator ]
+      summary: Получить список брендов по категории
+      security:
+        - BearerAuth: [ ]
+      parameters:
+        - in: query
+          name: category
+          required: true
+          schema:
+            type: string
+            enum: [ cpu, gpu, motherboard, ram, hdd, ssd, cooler, case, psu ]
+          description: Категория компонентов
+      responses:
+        '200':
+          description: Массив названий брендов
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+        '400':
+          description: Ошибка валидации запроса
   /config/compatible:
     post:
       tags: [ Configurator ]

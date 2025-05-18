@@ -279,6 +279,15 @@ INSERT INTO shops (code, name, base_url, api_endpoint)
 VALUES
     ('Citilink', 'Citilink Shop', 'https://www.citilink.ru/', NULL)
 ;
+INSERT INTO shops (code, name, base_url, api_endpoint)
+VALUES
+    ('Regard', 'Regard Shop', 'https://www.regard.ru/', NULL)
+;
+INSERT INTO shops (code, name, base_url, api_endpoint)
+VALUES
+    ('Nix', 'Nix Shop', 'https://www.nix.ru/', NULL)
+;
+
 -- CPUs: добавляем power_draw равный TDP
 UPDATE components
 SET specs = specs || '{"power_draw": 65}'::jsonb
