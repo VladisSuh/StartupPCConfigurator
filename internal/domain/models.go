@@ -116,3 +116,9 @@ type Notification struct {
 	IsRead      bool      `db:"is_read" json:"isRead"`
 	CreatedAt   time.Time `db:"created_at" json:"createdAt"`
 }
+
+// NamedBuild — сборка с названием
+type NamedBuild struct {
+	Name       string      `json:"name"`
+	Components []Component `json:"components"`
+}

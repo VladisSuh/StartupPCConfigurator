@@ -1,4 +1,4 @@
-package usecase
+package rules
 
 // Расширяем ScenarioRule новыми полями Min/Max для CPU-TDP, RAM, GPU-памяти и PSU
 type ScenarioRule struct {

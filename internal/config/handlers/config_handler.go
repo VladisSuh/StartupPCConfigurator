@@ -201,7 +201,7 @@ func (h *ConfigHandler) ListUseCases(c *gin.Context) {
 // GetUseCaseBuild обрабатывает GET /config/usecase/:name
 func (h *ConfigHandler) GetUseCaseBuild(c *gin.Context) {
 	name := c.Param("name")
-	build, err := h.service.GetUseCaseBuild(name, 10)
+	build, err := h.service.GetUseCaseBuild(name, 5)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return

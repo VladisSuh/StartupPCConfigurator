@@ -32,11 +32,7 @@ Content-Type: application/json
 #       "expires_at":   "..."
 #   }
 ################################################################################
-<<<<<<< HEAD
-@access_token  = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImtyYXNpbmFfMjAwM0BtYWlsLnJ1IiwiZXhwIjoxNzQ3NjU5MDMxLCJ1c2VyX2lkIjoiNmU3Zjk5N2ItNTQwNS00YzlkLTllOWUtYTNhMzc0MWUzNDk2In0.LFNc_qlzkv46ViWogado9CEbdXKvj7Txx_qVQ6e-0i4
-=======
-@access_token  = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImtyYXNpbmFfMjAwM0BtYWlsLnJ1IiwiZXhwIjoxNzQ3NjY4NDEwLCJ1c2VyX2lkIjoiZGJiN2YyZmQtYmI3OS00Nzg4LWJkYWUtODM5Y2NhMThhZWFjIn0.PpCSofyC073h9ETgLyMdetm3wdJJRqZRvjn1LnIyGYY
->>>>>>> 910b381 (components and configurations user)
+@access_token  = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImtyYXNpbmFfMjAwM0BtYWlsLnJ1IiwiZXhwIjoxNzQ4MzU4OTY3LCJ1c2VyX2lkIjoiODViZDNhYmQtZjJmMC00MjQyLThhNzQtN2YwMDU2NTk5YjkwIn0._drI3-C1oSQaXnlykR6R7mqB4R8DisHVpG9mdBVpDbQ
 @refresh_token = 2
 
 ################################################################################
@@ -117,7 +113,7 @@ GET {{config_host}}/config/components
 # Authorization: Bearer {{access_token}}
 
 ### 11.1 получить компоненты по категории
-GET {{config_host}}/config/components?category=hdd
+GET {{config_host}}/config/components?category=cooler
 Authorization: Bearer {{access_token}}
 
 ### 11.2 поиск компонентов по названию
@@ -332,24 +328,8 @@ GET {{config_host}}/config/usecases
 
 ################################################################################
 ### 24. получить готовые сборки по сценарию
-GET {{config_host}}/config/usecase/gaming
+GET {{config_host}}/config/usecase/streamer
 # Authorization: Bearer {{access_token}}  (необязательно)
-
-
-################################################################################
-### 27. генерация сборок по сценарию с учётом входных компонентов
-POST {{config_host}}/config/usecase/office/generate
-Content-Type: application/json
-# Authorization: Bearer {{access_token}}  (необязательно)
-
-{
-  "components": [
-    {
-      "category": "cpu",
-      "name": "AMD Ryzen 5 5600X"
-    }
-  ]
-}
 
 ###GET на агрегатор
 GET http://localhost:8080/offers?

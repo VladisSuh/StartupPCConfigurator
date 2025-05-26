@@ -2,10 +2,12 @@ package usecase
 
 import (
 	"StartupPCConfigurator/internal/config/repository"
+	"StartupPCConfigurator/internal/config/usecase/rules"
 	"StartupPCConfigurator/internal/domain"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/google/uuid"
@@ -16,6 +18,14 @@ var (
 	ErrForbidden      = errors.New("not owner of configuration")
 )
 
+var buildLabels = []string{
+	"Бюджетная сборка",
+	"Приемлемая сборка",
+	"Сбалансированная сборка",
+	"Улучшенная сборка",
+	"Максимальная сборка",
+}
+
 type ConfigService interface {
 	FetchComponents(category, search, brand, usecase string) ([]domain.Component, error)
 	CreateConfiguration(userId uuid.UUID, name string, comps []domain.ComponentRef) (domain.Configuration, error)
@@ -24,7 +34,7 @@ type ConfigService interface {
 	UpdateConfiguration(userId uuid.UUID, configId string, name string, comps []domain.ComponentRef) (domain.Configuration, error)
 	DeleteConfiguration(userId uuid.UUID, configId string) error
 	GenerateConfigurations(refs []domain.ComponentRef) ([][]domain.Component, error)
-	GetUseCaseBuild(usecaseName string, limit int) ([][]domain.Component, error)
+	GetUseCaseBuild(usecaseName string, limit int) ([]domain.NamedBuild, error)
 	GenerateUseCaseConfigs(usecaseName string, refs []domain.ComponentRef) ([][]domain.Component, error)
 	ListUseCases() ([]domain.UseCase, error)
 	ListBrands(category string) ([]string, error)
@@ -52,7 +62,7 @@ func (s *configService) FetchComponents(
 	if usecase == "" {
 		return comps, nil
 	}
-	rule, ok := ScenarioRules[usecase]
+	rule, ok := rules.ScenarioRules[usecase]
 	if !ok {
 		return nil, fmt.Errorf("unknown usecase %q", usecase)
 	}
@@ -118,7 +128,7 @@ func (s *configService) FetchCompatibleComponentsMulti(
 
 	// 2) Применяем фильтрацию по сценарию, если он указан
 	if usecase != nil && *usecase != "" {
-		rule, ok := ScenarioRules[*usecase]
+		rule, ok := rules.ScenarioRules[*usecase]
 		if !ok {
 			return nil, fmt.Errorf("unknown usecase %q", *usecase)
 		}
@@ -306,7 +316,6 @@ func (s *configService) DeleteConfiguration(userId uuid.UUID, configId string) e
 }
 
 func (s *configService) GenerateConfigurations(refs []domain.ComponentRef) ([][]domain.Component, error) {
-	// 1) По refs собираем выбранные компоненты
 	var selected []domain.Component
 	for _, ref := range refs {
 		comp, err := s.repo.GetComponentByName(ref.Category, ref.Name)
@@ -316,25 +325,26 @@ func (s *configService) GenerateConfigurations(refs []domain.ComponentRef) ([][]
 		selected = append(selected, comp)
 	}
 
-	// 2) Подгружаем все компоненты из репозитория
 	all, err := s.repo.GetComponents("", "", "")
 	if err != nil {
 		return nil, fmt.Errorf("failed to load components: %w", err)
 	}
 
-	// 3) Генерируем все совместимые сборки из полного списка
-	configs := GenerateConfigurations(all)
+	grouped := make(map[string][]domain.Component)
+	for _, comp := range all {
+		grouped[strings.ToLower(comp.Category)] = append(grouped[strings.ToLower(comp.Category)], comp)
+	}
 
-	// 4) Фильтруем, оставляя только сборки, содержащие все выбранные компоненты
-	//    при этом сравниваем категории в нижнем регистре
-	filtered := make([][]domain.Component, 0, len(configs))
-	for _, combo := range configs {
+	candidates := generateLimitedCombos(grouped, 100)
+	seen := make(map[string]struct{})
+	filtered := make([][]domain.Component, 0, 10)
+
+	for _, combo := range candidates {
 		ok := true
 		for _, want := range selected {
-			wantCat := strings.ToLower(want.Category) // <-- нормализация want
 			found := false
 			for _, have := range combo {
-				if strings.ToLower(have.Category) == wantCat && have.Name == want.Name {
+				if strings.EqualFold(have.Category, want.Category) && have.Name == want.Name {
 					found = true
 					break
 				}
@@ -344,41 +354,119 @@ func (s *configService) GenerateConfigurations(refs []domain.ComponentRef) ([][]
 				break
 			}
 		}
-		if ok {
-			filtered = append(filtered, combo)
+		if !ok {
+			continue
+		}
+
+		hash := hashCombo(combo)
+		if _, exists := seen[hash]; exists {
+			continue
+		}
+		seen[hash] = struct{}{}
+		filtered = append(filtered, combo)
+
+		if len(filtered) >= 10 {
+			break
 		}
 	}
 
 	return filtered, nil
 }
 
+func generateLimitedCombos(grouped map[string][]domain.Component, max int) [][]domain.Component {
+	required := []string{"cpu", "motherboard", "ram", "gpu", "psu", "case", "ssd"}
+	result := make([][]domain.Component, 0, max)
+
+	var dfs func(depth int, combo []domain.Component)
+	dfs = func(depth int, combo []domain.Component) {
+		if len(result) >= max {
+			return
+		}
+		if depth == len(required) {
+			if CheckCompatibility(combo) == nil {
+				cp := make([]domain.Component, len(combo))
+				copy(cp, combo)
+				result = append(result, cp)
+			}
+			return
+		}
+		cat := required[depth]
+		for _, comp := range grouped[cat] {
+			dfs(depth+1, append(combo, comp))
+		}
+	}
+
+	dfs(0, nil)
+	return result
+}
+
+func hashCombo(combo []domain.Component) string {
+	sort.Slice(combo, func(i, j int) bool {
+		return combo[i].Category < combo[j].Category
+	})
+	var sb strings.Builder
+	for _, c := range combo {
+		sb.WriteString(strings.ToLower(c.Category))
+		sb.WriteString(":" + c.Name + ";")
+	}
+	return sb.String()
+}
+
 // 4) Функция matchesScenario рядом, в том же файле
-func (s *configService) GetUseCaseBuild(usecaseName string, limit int) ([][]domain.Component, error) {
-	rule, ok := ScenarioRules[usecaseName]
+func (s *configService) GetUseCaseBuild(usecaseName string, limit int) ([]domain.NamedBuild, error) {
+	rule, ok := rules.ScenarioRules[usecaseName]
 	if !ok {
 		return nil, fmt.Errorf("unknown use case %q", usecaseName)
 	}
 
-	all, err := s.repo.GetComponents("", "", "")
+	all, err := s.repo.GetComponentsByUseCase(usecaseName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load components: %w", err)
 	}
 
 	combos := GenerateConfigurations(all)
-	var results [][]domain.Component
+	seen := make(map[string]struct{})
+	ranked := make(map[int][]domain.Component) // rank 0..4 → first combo
+
 	for _, combo := range combos {
-		if matchesScenario(combo, rule) {
-			results = append(results, combo)
-			if len(results) >= limit {
-				break
-			}
+		if !matchesScenario(combo, rule) {
+			continue
+		}
+		hash := hashCombo(combo)
+		if _, ok := seen[hash]; ok {
+			continue
+		}
+		seen[hash] = struct{}{}
+
+		rank := rankBuildByScenario(rule, combo)
+		if rank >= len(buildLabels) {
+			rank = len(buildLabels) - 1
+		}
+		// добавим только если ещё нет такой сборки
+		if _, exists := ranked[rank]; !exists {
+			ranked[rank] = combo
+		}
+
+		if len(ranked) == len(buildLabels) {
+			break // все 5 типов собраны
 		}
 	}
 
-	if len(results) == 0 {
+	if len(ranked) == 0 {
 		return nil, fmt.Errorf("no builds found for use case %q", usecaseName)
 	}
-	return results, nil
+
+	var builds []domain.NamedBuild
+	for rank := 0; rank < len(buildLabels); rank++ {
+		if combo, ok := ranked[rank]; ok {
+			builds = append(builds, domain.NamedBuild{
+				Name:       buildLabels[rank],
+				Components: combo,
+			})
+		}
+	}
+
+	return builds, nil
 }
 
 var caseSupportedMap = map[string][]string{
@@ -387,8 +475,8 @@ var caseSupportedMap = map[string][]string{
 	"Mini-ITX":  {"Mini-ITX"},
 }
 
-// matchesScenario проверяет, подходит ли комбинация компонентов под правило ScenarioRule.
-func matchesScenario(combo []domain.Component, rule ScenarioRule) bool {
+// matchesScenario проверяет, подходит ли комбинация компонентов под правило rules.ScenarioRule.
+func matchesScenario(combo []domain.Component, rule rules.ScenarioRule) bool {
 	var cpu, mb, ram, gpu, psu, cs *domain.Component
 
 	// Разбираем combo по категориям
@@ -527,7 +615,7 @@ func contains(ss []string, s string) bool {
 
 func (s *configService) GenerateUseCaseConfigs(usecaseName string, refs []domain.ComponentRef) ([][]domain.Component, error) {
 	// 1) Получаем правило
-	rule, ok := ScenarioRules[usecaseName]
+	rule, ok := rules.ScenarioRules[usecaseName]
 	if !ok {
 		return nil, fmt.Errorf("unknown use case %q", usecaseName)
 	}
@@ -541,11 +629,11 @@ func (s *configService) GenerateUseCaseConfigs(usecaseName string, refs []domain
 		selected = append(selected, comp)
 	}
 	// 3) Загружаем всё и получаем все совместимые комбо
-	all, err := s.repo.GetComponents("", "", "")
+	filtered, err := s.repo.GetComponentsByUseCase(usecaseName)
 	if err != nil {
 		return nil, err
 	}
-	combos := GenerateConfigurations(all)
+	combos := GenerateConfigurations(filtered)
 	// 4) Фильтр: содержит все selected **и** соответствует сценарию
 	var out [][]domain.Component
 	for _, combo := range combos {
@@ -585,7 +673,7 @@ func (s *configService) ListBrands(category string) ([]string, error) {
 	return s.repo.GetBrandsByCategory(category)
 }
 
-func cpuMatches(c domain.Component, rule ScenarioRule) bool {
+func cpuMatches(c domain.Component, rule rules.ScenarioRule) bool {
 	specs := parseSpecs(c.Specs)
 	// 1) socket
 	sock, _ := specs["socket"].(string)
@@ -605,7 +693,7 @@ func cpuMatches(c domain.Component, rule ScenarioRule) bool {
 	return true
 }
 
-func mbMatches(c domain.Component, rule ScenarioRule) bool {
+func mbMatches(c domain.Component, rule rules.ScenarioRule) bool {
 	specs := parseSpecs(c.Specs)
 	// RAM-type согласовать
 	if rule.RAMType != "" {
@@ -619,7 +707,7 @@ func mbMatches(c domain.Component, rule ScenarioRule) bool {
 	return true
 }
 
-func ramMatches(c domain.Component, rule ScenarioRule) bool {
+func ramMatches(c domain.Component, rule rules.ScenarioRule) bool {
 	specs := parseSpecs(c.Specs)
 	if rt, _ := specs["ram_type"].(string); rt != rule.RAMType {
 		return false
@@ -636,7 +724,7 @@ func ramMatches(c domain.Component, rule ScenarioRule) bool {
 	return true
 }
 
-func gpuMatches(c domain.Component, rule ScenarioRule) bool {
+func gpuMatches(c domain.Component, rule rules.ScenarioRule) bool {
 	// GPU необязателен, но если MinGPUMemory>0 — проверяем
 	if rule.MinGPUMemory == 0 {
 		return true
@@ -655,7 +743,7 @@ func gpuMatches(c domain.Component, rule ScenarioRule) bool {
 	return false
 }
 
-func psuMatches(c domain.Component, rule ScenarioRule) bool {
+func psuMatches(c domain.Component, rule rules.ScenarioRule) bool {
 	specs := parseSpecs(c.Specs)
 	if powRaw, ok := specs["power"].(float64); ok {
 		p := int(powRaw)
@@ -669,7 +757,7 @@ func psuMatches(c domain.Component, rule ScenarioRule) bool {
 	return true
 }
 
-func caseMatches(c domain.Component, rule ScenarioRule) bool {
+func caseMatches(c domain.Component, rule rules.ScenarioRule) bool {
 	specs := parseSpecs(c.Specs)
 	cf, _ := specs["form_factor"].(string)
 	// 1) корпус сам должен быть разрешён в сценарии
@@ -679,7 +767,7 @@ func caseMatches(c domain.Component, rule ScenarioRule) bool {
 	return true
 }
 
-func ssdMatches(c domain.Component, rule ScenarioRule) bool {
+func ssdMatches(c domain.Component, rule rules.ScenarioRule) bool {
 	var specs struct {
 		MaxThroughput float64 `json:"max_throughput"`
 		FormFactor    string  `json:"form_factor"`
@@ -696,4 +784,94 @@ func ssdMatches(c domain.Component, rule ScenarioRule) bool {
 		}
 	}
 	return false
+}
+
+func rankBuildByScenario(rule rules.ScenarioRule, combo []domain.Component) int {
+	score := 0.0
+	total := 0.0
+
+	get := func(cat string) *domain.Component {
+		for _, c := range combo {
+			if strings.EqualFold(c.Category, cat) {
+				return &c
+			}
+		}
+		return nil
+	}
+
+	// CPU
+	if cpu := get("cpu"); cpu != nil {
+		specs := parseSpecs(cpu.Specs)
+		if tdp, ok := specs["tdp"].(float64); ok {
+			tdpInt := int(tdp)
+			total += 1
+			score += normalize(tdpInt, rule.MinCPUTDP, rule.MaxCPUTDP)
+		}
+	}
+
+	// RAM
+	if ram := get("ram"); ram != nil {
+		specs := parseSpecs(ram.Specs)
+		if cap, ok := specs["capacity"].(float64); ok {
+			capInt := int(cap)
+			total += 1
+			score += normalize(capInt, rule.MinRAM, rule.MaxRAM)
+		}
+	}
+
+	// GPU
+	if gpu := get("gpu"); gpu != nil {
+		specs := parseSpecs(gpu.Specs)
+		if mem, ok := specs["memory_gb"].(float64); ok {
+			memInt := int(mem)
+			total += 1
+			score += normalize(memInt, rule.MinGPUMemory, rule.MaxGPUMemory)
+		}
+	}
+
+	// PSU
+	if psu := get("psu"); psu != nil {
+		specs := parseSpecs(psu.Specs)
+		if pwr, ok := specs["power"].(float64); ok {
+			pwrInt := int(pwr)
+			total += 1
+			score += normalize(pwrInt, rule.MinPSUPower, rule.MaxPSUPower)
+		}
+	}
+
+	// SSD
+	if ssd := get("ssd"); ssd != nil {
+		specs := parseSpecs(ssd.Specs)
+		if tput, ok := specs["max_throughput"].(float64); ok {
+			tputInt := int(tput)
+			total += 1
+			score += normalize(tputInt, rule.MinSSDThroughput, rule.MinSSDThroughput*4) // разумный потолок
+		}
+	}
+
+	if total == 0 {
+		return 0
+	}
+	avg := score / total
+
+	// Mapping: [0..0.2]=0, [0.2..0.4]=1, ..., [0.8..1.0]=4
+	switch {
+	case avg < 0.2:
+		return 0
+	case avg < 0.4:
+		return 1
+	case avg < 0.6:
+		return 2
+	case avg < 0.8:
+		return 3
+	default:
+		return 4
+	}
+}
+
+func normalize(val, min, max int) float64 {
+	if max == min {
+		return 1
+	}
+	return float64(val-min) / float64(max-min)
 }
