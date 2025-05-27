@@ -55,6 +55,13 @@ func (uc *updateUseCase) ProcessShopUpdate(ctx context.Context, jobID, shopID in
 			continue
 		}
 
+		// внутри цикла импорта
+		oldPrice, err := uc.repo.GetOfferPrice(ctx, it.ComponentID, shopID)
+		if err != nil {
+			uc.logger.Printf("cannot get old price: %v", err)
+			oldPrice = 0
+		}
+
 		// upsert в offers
 		if err := uc.repo.UpsertOffer(ctx, it.ComponentID, shopID, price, parsed.Availability, parsed.URL); err != nil {
 			uc.logger.Printf("db error upsert offer: %v", err)
@@ -65,16 +72,8 @@ func (uc *updateUseCase) ProcessShopUpdate(ctx context.Context, jobID, shopID in
 			uc.logger.Printf("db error insert history: %v", err)
 		}
 
-		// внутри цикла импорта
-		oldPrice, err := uc.repo.GetOfferPrice(ctx, it.ComponentID, shopID)
-		if err != nil {
-			uc.logger.Printf("cannot get old price: %v", err)
-			oldPrice = 0
-		}
-		newPrice := price
-		ComponentID := it.ComponentID
-		if oldPrice != newPrice {
-			if err := uc.publisher.PublishPriceChanged(ComponentID, shopID, newPrice); err != nil {
+		if oldPrice != price {
+			if err := uc.publisher.PublishPriceChanged(it.ComponentID, shopID, oldPrice, price); err != nil {
 				uc.logger.Printf("failed to publish price.changed: %v", err)
 			}
 		}

@@ -32,11 +32,7 @@ Content-Type: application/json
 #       "expires_at":   "..."
 #   }
 ################################################################################
-<<<<<<< HEAD
-@access_token  = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImtyYXNpbmFfMjAwM0BtYWlsLnJ1IiwiZXhwIjoxNzQ3NjU5MDMxLCJ1c2VyX2lkIjoiNmU3Zjk5N2ItNTQwNS00YzlkLTllOWUtYTNhMzc0MWUzNDk2In0.LFNc_qlzkv46ViWogado9CEbdXKvj7Txx_qVQ6e-0i4
-=======
-@access_token  = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImtyYXNpbmFfMjAwM0BtYWlsLnJ1IiwiZXhwIjoxNzQ3NjY4NDEwLCJ1c2VyX2lkIjoiZGJiN2YyZmQtYmI3OS00Nzg4LWJkYWUtODM5Y2NhMThhZWFjIn0.PpCSofyC073h9ETgLyMdetm3wdJJRqZRvjn1LnIyGYY
->>>>>>> 910b381 (components and configurations user)
+@access_token  = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImtyYXNpbmFfMjAwM0BtYWlsLnJ1IiwiZXhwIjoxNzQ4NDM4MjgxLCJ1c2VyX2lkIjoiYmJkM2I1NmQtZDkzYy00M2M0LWJjMmMtYTBlOWMyNmFiMzA0In0.Z0D7LBejCYOmcdQL1fJOTwT-iELzJq7mftO-K01DACg
 @refresh_token = 2
 
 ################################################################################
@@ -378,4 +374,15 @@ Authorization: Bearer {{access_token}}
 
 ###Notifications GET на Redis
 GET http://localhost:8080/notifications/count
+Authorization: Bearer {{access_token}}
+
+###Post на Redis
+@notificationId = 77847fc5-9ba5-47b7-a7d6-067532edea19
+POST http://localhost:8080/notifications/{{notificationId}}/read
+Authorization: Bearer {{access_token}}
+
+###Страница с уведомлениями
+GET http://localhost:8080/notifications?
+    page=1&
+    pageSize=10
 Authorization: Bearer {{access_token}}
