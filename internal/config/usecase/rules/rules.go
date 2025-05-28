@@ -112,11 +112,11 @@ var ScenarioRules = map[string]ScenarioRule{
 
 	"enthusiast": {
 		CPUSocketWhitelist: []string{"AM5", "LGA1700"},
-		MinCPUTDP:          95, MaxCPUTDP: 170,
+		MinCPUTDP:          65, MaxCPUTDP: 170,
 		RAMType: "DDR5",
 		MinRAM:  32, MaxRAM: 128,
 		MinGPUMemory: 8, MaxGPUMemory: 24,
-		MinPSUPower: 850, MaxPSUPower: 1500,
+		MinPSUPower: 650, MaxPSUPower: 1500,
 		CaseFormFactors:  []string{"ATX"},
 		MinSSDThroughput: 4000,
 		SSDFormFactors:   []string{"M.2"},
@@ -129,8 +129,8 @@ var ScenarioRules = map[string]ScenarioRule{
 		MinRAM:  8, MaxRAM: 32,
 		MinGPUMemory: 0, MaxGPUMemory: 4,
 		MinPSUPower: 300, MaxPSUPower: 500,
-		CaseFormFactors:  []string{"Mini-ITX"},
+		CaseFormFactors:  []string{"Mini-ITX", "Micro-ATX"},
 		MinSSDThroughput: 0,
-		SSDFormFactors:   []string{"2.5"},
+		SSDFormFactors:   []string{"2.5", "M.2"},
 	},
 }

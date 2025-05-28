@@ -327,8 +327,9 @@ GET {{config_host}}/config/usecases
 # Authorization: Bearer {{access_token}}  (необязательно)
 
 ################################################################################
-### 24. получить готовые сборки по сценарию
-GET {{config_host}}/config/usecase/streamer
+### 24. получить готовые сборки по сценарию 
+### office 
+GET {{config_host}}/config/usecase/office
 # Authorization: Bearer {{access_token}}  (необязательно)
 
 ###GET на агрегатор

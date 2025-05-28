@@ -4,7 +4,6 @@ import (
 	"StartupPCConfigurator/internal/domain"
 	"errors"
 	"net/http"
-	"strings"
 
 	"StartupPCConfigurator/internal/config/usecase"
 
@@ -214,29 +213,6 @@ type GenerateUseCaseConfigsRequest struct {
 	Components []ComponentRef `json:"components"`
 }
 
-// GenerateUseCaseConfigs обрабатывает POST /config/usecase/:name/generate
-func (h *ConfigHandler) GenerateUseCaseConfigs(c *gin.Context) {
-	name := c.Param("name")
-
-	var req GenerateUseCaseConfigsRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
-		return
-	}
-
-	configs, err := h.service.GenerateUseCaseConfigs(name, toDomainRefs(req.Components))
-	if err != nil {
-		// различаем неизвестный сценарий и прочие ошибки
-		if strings.HasPrefix(err.Error(), "unknown use case") {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		}
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"configs": configs})
-}
-
 // вспомогательная конвертация, как и для Create/Update
 func toDomainRefs(input []ComponentRef) []domain.ComponentRef {
 	var result []domain.ComponentRef
@@ -247,23 +223,4 @@ func toDomainRefs(input []ComponentRef) []domain.ComponentRef {
 		})
 	}
 	return result
-}
-
-// POST /config/generate
-func (h *ConfigHandler) GenerateConfigs(c *gin.Context) {
-	var req struct {
-		Components []domain.ComponentRef `json:"components"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	configs, err := h.service.GenerateConfigurations(req.Components)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"configs": configs})
 }

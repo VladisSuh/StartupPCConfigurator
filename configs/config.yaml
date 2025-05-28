@@ -218,12 +218,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  components:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Component'
+                $ref: '#/components/schemas/UseCase'
         '404':
           description: Сценарий не найден
 
@@ -527,45 +522,6 @@ paths:
           description: Подписка не найдена
 components:
   schemas:
-    CompatibleRequest:
-      type: object
-      required:
-        - category
-        - bases
-      properties:
-        category:
-          type: string
-          description: Категория искомых компонентов (например, "cpu", "ssd" и т.д.)
-        bases:
-          type: array
-          description: Базовые компоненты, от которых зависит совместимость
-          items:
-            type: object
-            required:
-              - category
-              - name
-            properties:
-              category:
-                type: string
-                description: Категория базового компонента
-              name:
-                type: string
-                description: Название базового компонента
-        brand:
-          type: string
-          description: Фильтр по бренду (необязательно)
-        usecase:
-          type: string
-          description: Фильтр по сценарию использования (необязательно)
-      example:
-        category: ssd
-        bases:
-          - category: motherboard
-            name: MSI B550 Tomahawk
-        brand: "Samsung"
-        usecase: "gaming"
-
-  schemas:
     RegisterRequest:
       type: object
       properties:
@@ -579,7 +535,19 @@ components:
       required:
         - email
         - password
-
+    UseCase:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Название сборки (например, «Бюджетная сборка»)
+        components:
+          type: array
+          items:
+            $ref: '#/components/schemas/Component'
+      required:
+        - name
+        - components
     LoginRequest:
       type: object
       properties:
@@ -650,6 +618,7 @@ components:
 
     CompatibleRequest:
       type: object
+      required: [ category, bases ]
       properties:
         category:
           type: string
@@ -658,7 +627,12 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CompatibleBase'
-      required: [ category, bases ]
+        brand:
+          type: string
+          description: Необязательный фильтр по бренду
+        usecase:
+          type: string
+          description: Необязательный фильтр по сценарию
 
     CreateConfigRequest:
       type: object

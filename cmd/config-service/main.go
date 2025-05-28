@@ -50,8 +50,6 @@ func main() {
 	r.POST("/compatible", h.GetCompatibleComponentsMulti)
 	r.GET("/usecases", h.ListUseCases)
 	r.GET("/usecase/:name", h.GetUseCaseBuild)
-	r.POST("/generate", h.GenerateConfigs)
-	r.POST("/usecase/:name/generate", h.GenerateUseCaseConfigs)
 	r.GET("/brands", h.GetBrands)
 
 	// 7. Защищённые ручки
