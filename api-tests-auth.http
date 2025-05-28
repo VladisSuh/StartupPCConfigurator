@@ -360,3 +360,14 @@ Authorization: Bearer {{access_token}}
 ###Notifications GET на Redis
 GET http://localhost:8080/notifications/count
 Authorization: Bearer {{access_token}}
+
+###Post на Redis
+@notificationId = 77847fc5-9ba5-47b7-a7d6-067532edea19
+POST http://localhost:8080/notifications/{{notificationId}}/read
+Authorization: Bearer {{access_token}}
+
+###Страница с уведомлениями
+GET http://localhost:8080/notifications?
+    page=1&
+    pageSize=10
+Authorization: Bearer {{access_token}}

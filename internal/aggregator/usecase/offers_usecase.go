@@ -94,7 +94,7 @@ func (uc *offersUseCase) ImportPriceList(ctx context.Context, r io.Reader) error
 
 		// 3) если изменилась — публикуем в RabbitMQ
 		if price != old {
-			if err := uc.publisher.PublishPriceChanged(row[0], shopID, price); err != nil {
+			if err := uc.publisher.PublishPriceChanged(row[0], shopID, old, price); err != nil {
 				uc.logger.Printf("publish failed: %v", err)
 			}
 		}

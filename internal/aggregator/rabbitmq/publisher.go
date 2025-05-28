@@ -61,17 +61,19 @@ func (p *AggregatorPublisher) PublishPriceUpdated(shopID string, componentID str
 func (p *AggregatorPublisher) PublishPriceChanged(
 	componentID string,
 	shopID int64,
-	price float64,
+	oldPrice, newPrice float64,
 ) error {
 	// Собираем структуру, совпадающую с JSON-схемой
 	evt := struct {
 		ComponentID string  `json:"componentId"`
 		ShopID      int64   `json:"shopId"`
-		Price       float64 `json:"price"`
+		OldPrice    float64 `json:"oldPrice"`
+		NewPrice    float64 `json:"newPrice"`
 	}{
 		ComponentID: componentID,
 		ShopID:      shopID,
-		Price:       price,
+		OldPrice:    oldPrice,
+		NewPrice:    newPrice,
 	}
 	body, err := json.Marshal(evt)
 	if err != nil {

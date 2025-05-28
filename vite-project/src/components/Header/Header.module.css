@@ -23,12 +23,15 @@
 .icon {
     width: 30px;
     height: 30px;
+}
 
+.iconActive {
+    fill: rgb(255, 115, 0);
 }
 
 .logoutIcon {
-    width: 30px;
-    height: 30px;
+    width: 20px;
+    height: 20px;
     filter: brightness(0) invert(1);
     margin-left: 40px;
 }
@@ -65,4 +68,25 @@
 
 .dropdown button:hover {
     background: rgba(255, 255, 255, 0.1);
+}
+
+.navButton {
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.navButton:hover {
+    text-decoration: underline;
+}
+
+.active {
+    font-weight: bold;
+    color: orange;
+    /* или нужный цвет */
 }

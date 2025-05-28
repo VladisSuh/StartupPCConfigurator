@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import styles from './ComponentList.module.css';
 import { ComponentCard } from '../ComponentCard/ComponentCard';
 //import { mockComponents } from '../mockData/mock';
-import { Component, ComponentListProps } from '../../types/index';
+import { Component, ComponentListProps, UsecaseLabels, Usecases } from '../../types/index';
+import { useConfig } from '../../ConfigContext';
 
 
 
@@ -14,6 +15,11 @@ const ComponentList = ({
     const [allComponents, setAllComponents] = useState<Component[]>([]);
     const [сompatibleComponents, setCompatibleComponents] = useState<Component[]>([]);
     const [showCompatibleOnly, setShowCompatibleOnly] = useState(true);
+    const [isFiltersVisible, setIsFiltersVisible] = useState(false);
+    const [brands, setBrands] = useState<string[]>([]);
+    const { getBrands, isLoading, getUsecases } = useConfig()
+    const [activeBrandTab, setActiveBrandTab] = useState<string>('Все бренды');
+    const [activeUsecaseTab, setActiveUsecaseTab] = useState<string>('all');
 
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -22,14 +28,19 @@ const ComponentList = ({
     useEffect(() => {
         const fetchComponents = async () => {
             try {
-                setLoading(true);
+                //setLoading(true);
                 setError('');
 
-                const all = await fetchAllComponents(selectedCategory);
-                setAllComponents(all);
-                const compatible = await fetchCompatibleComponents(selectedCategory, selectedComponents)
-
+                const compatible = await fetchCompatibleComponents(selectedCategory, selectedComponents, activeUsecaseTab, activeBrandTab);
                 setCompatibleComponents(compatible)
+
+                const all = await fetchAllComponents(selectedCategory, activeUsecaseTab, activeBrandTab);
+                setAllComponents(all);
+
+                const brandsWithAll = ['Все бренды', ...getBrands(selectedCategory)];
+                setBrands(brandsWithAll);
+
+                console.log('Brands:', brandsWithAll);
 
             } catch (err) {
                 setError(err instanceof Error ? err.message : 'Неизвестная ошибка');
@@ -39,12 +50,35 @@ const ComponentList = ({
         };
 
         fetchComponents();
-    }, [selectedCategory]);
+    }, [selectedCategory, activeUsecaseTab, activeBrandTab]);
 
     if (error) return <div className={styles.error}>{error}</div>;
 
     return (
         <div className={styles.container}>
+            {<div className={styles.tabs}>
+                {Usecases.map(usecase => (
+                    <button
+                        key={usecase}
+                        className={`${styles.tab} ${usecase === activeUsecaseTab ? styles.activeTab : ''}`}
+                        onClick={() => setActiveUsecaseTab(usecase)}
+                    >
+                        {UsecaseLabels[usecase] || usecase}
+                    </button>
+                ))}
+            </div>}
+
+            {<div className={styles.brandTabs}>
+                {brands.map(brand => (
+                    <button
+                        key={brand}
+                        className={`${styles.tab} ${brand === activeBrandTab ? styles.activeTab : ''}`}
+                        onClick={() => setActiveBrandTab(brand)}
+                    >
+                        {brand}
+                    </button>
+                ))}
+            </div>}
 
             <div className={styles.controls}>
                 <label className={styles.checkboxLabel}>
@@ -91,47 +125,90 @@ export default ComponentList;
 
 
 
-const fetchAllComponents = async (category: string) => {
-    let url = `http://localhost:8080/config/compatible?category=${encodeURIComponent(category)}`;
+const fetchAllComponents = async (
+    category: string,
+    activeUsecaseTab: string,
+    activeBrandTab: string
+) => {
+    const params = new URLSearchParams();
+    params.append('category', category);
 
+    if (activeUsecaseTab !== 'all') {
+        params.append('usecase', activeUsecaseTab);
+    }
 
-    const response = await fetch(url);
+    if (activeBrandTab !== 'Все бренды') {
+        params.append('brand', activeBrandTab);
+    }
 
-    let d = await response.json()
+    const url = `http://localhost:8080/config/components?${params.toString()}`;
 
-    console.log('Response fetchAllComponents:', d); // Debugging line
+    const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+            'Accept': 'application/json',
+        },
+    });
 
     if (!response.ok) {
         throw new Error('Ошибка загрузки компонентов');
     }
-    return d;
+
+    const data = await response.json();
+    console.log('Response fetchAllComponents:', data); // Debugging line
+
+    return data;
 };
 
 const fetchCompatibleComponents = async (
     category: string,
-    selectedComponents: Record<string, Component | null>
+    selectedComponents: Record<string, Component | null>,
+    activeUsecaseTab: string,
+    activeBrandTab: string
 ) => {
-    let url = `http://localhost:8080/config/compatible?category=${encodeURIComponent(category)}`;
+    const url = 'http://localhost:8080/config/compatible';
 
-    Object.entries(selectedComponents).forEach(([category, component]) => {
-        if (component !== null) {
-            if (category=='cpu'){
-                url += `&${category}=${encodeURIComponent(component.specs.socket)}`
-            }else{
-                url += `&${category}=${encodeURIComponent(component.name)}`
-            }
-            
-        }
+    const bases = Object.entries(selectedComponents)
+        .filter(([_, component]) => component !== null)
+        .map(([key, component]) => {
+            return {
+                category: key,
+                name: component!.name
+            };
+        });
+
+    const requestBody: Record<string, any> = {
+        category,
+        bases
+    };
+
+    if (activeUsecaseTab !== 'all') {
+        requestBody['usecase'] = activeUsecaseTab;
+    }
+
+    if (activeBrandTab !== 'Все бренды') {
+        requestBody['brand'] = activeBrandTab;
+    }
+
+
+
+    console.log('Request body fetchCompatibleComponents:', requestBody);
+
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
     });
 
-    console.log('url', url)
+    const data = await response.json();
 
-    const response = await fetch(url);
-    let d = await response.json()
+    console.log('Response fetchCompatibleComponents:', data);
 
-    console.log('Response fetchCompatibleComponents:', d);
     if (!response.ok) {
         throw new Error('Ошибка загрузки совместимых компонентов');
     }
-    return d;
+
+    return data;
 };
