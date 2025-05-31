@@ -198,18 +198,22 @@ func (r *configRepository) CreateConfiguration(
 		}
 	}
 
+	// Стало так:
 	refs := make([]domain.ComponentRef, 0, len(components))
 	for _, c := range components {
 		refs = append(refs, domain.ComponentRef{
-			Category: c.Category,
+			ID:       c.ID,
 			Name:     c.Name,
+			Category: c.Category,
+			Brand:    c.Brand,
+			Specs:    c.Specs,
 		})
 	}
 
 	return domain.Configuration{
 		ID:         configID,
 		Name:       name,
-		OwnerID:    userId,
+		UserID:     userId,
 		Components: refs,
 		CreatedAt:  createdAt,
 		UpdatedAt:  updatedAt,
@@ -241,7 +245,7 @@ func (r *configRepository) UpdateConfiguration(
 	`
 	err = tx.QueryRow(queryCheck, configId).Scan(
 		&existing.ID,
-		&existing.OwnerID,
+		&existing.UserID,
 		&existing.Name,
 		&existing.CreatedAt,
 		&existing.UpdatedAt,
@@ -252,7 +256,7 @@ func (r *configRepository) UpdateConfiguration(
 		return domain.Configuration{}, err
 	}
 
-	if existing.OwnerID != userId {
+	if existing.UserID != userId {
 		return domain.Configuration{}, domain.ErrForbidden
 	}
 
@@ -291,7 +295,7 @@ func (r *configRepository) UpdateConfiguration(
 	// обновим время конфигурации
 	err = tx.QueryRow(queryCheck, configId).Scan(
 		&existing.ID,
-		&existing.OwnerID,
+		&existing.UserID,
 		&existing.Name,
 		&existing.CreatedAt,
 		&existing.UpdatedAt,
@@ -305,12 +309,15 @@ func (r *configRepository) UpdateConfiguration(
 		refs = append(refs, domain.ComponentRef{
 			Category: c.Category,
 			Name:     c.Name,
+			Brand:    c.Brand,
+			Specs:    c.Specs,
+			ID:       c.ID,
 		})
 	}
 
 	updatedConfig := domain.Configuration{
 		ID:         existing.ID,
-		OwnerID:    existing.OwnerID,
+		UserID:     existing.UserID,
 		Name:       existing.Name,
 		CreatedAt:  existing.CreatedAt,
 		UpdatedAt:  existing.UpdatedAt,
@@ -336,13 +343,13 @@ func (r *configRepository) GetUserConfigurations(userId uuid.UUID) ([]domain.Con
 	var configs []domain.Configuration
 	for rows.Next() {
 		var cfg domain.Configuration
-		cfg.OwnerID = userId
+		cfg.UserID = userId
 		if err := rows.Scan(&cfg.ID, &cfg.Name, &cfg.CreatedAt, &cfg.UpdatedAt); err != nil {
 			return nil, err
 		}
 
 		compQuery := `
-		SELECT c.name, c.category, c.id, c.specs
+		SELECT c.name, c.category, c.brand, c.id, c.specs
 		FROM configuration_components cc
 		JOIN components c ON cc.component_id = c.id
 		WHERE cc.config_id = $1
@@ -353,7 +360,7 @@ func (r *configRepository) GetUserConfigurations(userId uuid.UUID) ([]domain.Con
 		}
 		for compRows.Next() {
 			var ref domain.ComponentRef
-			if err := compRows.Scan(&ref.Name, &ref.Category, &ref.ID, &ref.Specs); err != nil {
+			if err := compRows.Scan(&ref.Name, &ref.Category, &ref.Brand, &ref.ID, &ref.Specs); err != nil {
 				compRows.Close()
 				return nil, err
 			}
