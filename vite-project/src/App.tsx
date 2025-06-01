@@ -6,6 +6,7 @@ import Header from './components/Header/Header';
 import { categories, CategoryType, Page } from './types';
 import Account from './components/Account/Account';
 import { ConfigProvider } from './ConfigContext';
+import UsecasesPage from './components/UsecasesPage/UsecasesPage';
 
 function App() {
   const [currentPage, setCurrentPage] = useState<Page>('configurator');
@@ -16,6 +17,7 @@ function App() {
       <ConfigProvider>
         <Header setCurrentPage={setCurrentPage} currentPage={currentPage} />
         {currentPage === 'configurator' && <Configurator />}
+        {currentPage === 'usecases' && <UsecasesPage />}
         {currentPage === 'account' && <Account />}
       </ConfigProvider>
     </AuthProvider>
