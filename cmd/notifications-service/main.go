@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"database/sql"
-	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
 	_ "github.com/lib/pq"
@@ -112,7 +111,6 @@ func main() {
 
 	// === 7. HTTP Server (Gin) ===
 	r := gin.Default()
-	r.Use(cors.Default())
 
 	// Protected routes
 	n := r.Group("/notifications")

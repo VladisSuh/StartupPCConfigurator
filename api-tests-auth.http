@@ -32,7 +32,7 @@ Content-Type: application/json
 #       "expires_at":   "..."
 #   }
 ################################################################################
-@access_token  = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImtyYXNpbmFfMjAwM0BtYWlsLnJ1IiwiZXhwIjoxNzQ4MzU4OTY3LCJ1c2VyX2lkIjoiODViZDNhYmQtZjJmMC00MjQyLThhNzQtN2YwMDU2NTk5YjkwIn0._drI3-C1oSQaXnlykR6R7mqB4R8DisHVpG9mdBVpDbQ
+@access_token  = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImtyYXNpbmFfMjAwM0BtYWlsLnJ1IiwiZXhwIjoxNzQ4ODUzNDE0LCJ1c2VyX2lkIjoiYjZmNjc0YWMtNDRlMC00ZDMwLTk2NjMtZDUyYmY2OWEwMmVjIn0.SqNisqPVPXXp1lEKkKHwt6J65AMkudHEnvJj3JB14tQ
 @refresh_token = 2
 
 ################################################################################
@@ -362,7 +362,7 @@ GET http://localhost:8080/notifications/count
 Authorization: Bearer {{access_token}}
 
 ###Post на Redis
-@notificationId = 77847fc5-9ba5-47b7-a7d6-067532edea19
+@notificationId = f800a2a5-f5a9-4c6a-ab95-769b95b77dc7
 POST http://localhost:8080/notifications/{{notificationId}}/read
 Authorization: Bearer {{access_token}}
 
