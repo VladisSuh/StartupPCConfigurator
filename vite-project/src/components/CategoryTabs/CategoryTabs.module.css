@@ -6,12 +6,12 @@
     /* width: 300px; */
     text-align: left;
     font-size: 14px;
-    color: #fff;
+    color: var(--text-primary);
     width: 250px;
 }
 
 .tab {
-    position: relative; /* Нужно для абсолютного позиционирования псевдоэлемента */
+    position: relative; 
     width: 100%;
     min-height: 70px;
     padding: 10px 15px;
@@ -29,11 +29,11 @@
     position: relative; 
     background: linear-gradient(114.13deg, #00fff200 40.14%,#00fff218 60.14%, var(--green) 134.41%);
     border-left: none; 
-    border-right: 1px solid #2dce989d;
-    border-top: 1px solid #2dce989d;
-    border-bottom: 1px solid #2dce989d;
+    border-right: 1px solid var(--tab-active-border);
+    border-top: 1px solid var(--tab-active-border);
+    border-bottom: 1px solid var(--tab-active-border);
     transition: background 0.5s ease;
-    color: rgb(255, 255, 255)
+    color: var(--text-primary);
 }
 
 

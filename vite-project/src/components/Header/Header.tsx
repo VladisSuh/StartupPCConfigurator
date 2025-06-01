@@ -35,13 +35,13 @@ const Header = ({ setCurrentPage, currentPage }: { setCurrentPage: (page: Page) 
 
                 const token = getToken();
                 console.log('Получение количества непрочитанных уведомлений с токеном:', token);
-                console.log('Запрос',{
+                console.log('Запрос', {
                     headers: {
                         'Authorization': `Bearer ${token}`
                     },
                 });
 
-                const response = await fetch('http://localhost:8080/notifications/unread-count', {
+                const response = await fetch('http://localhost:8080/notifications/count', {
                     headers: {
                         'Authorization': `Bearer ${token}`
                     },
@@ -51,14 +51,16 @@ const Header = ({ setCurrentPage, currentPage }: { setCurrentPage: (page: Page) 
                     throw new Error('Ошибка запроса');
                 }
                 const data = await response.json();
-                setUnreadCount(data.count || 0);
+                console.log(data)
+                setUnreadCount(data.unread || 0);
+                console.log('unreadCount', unreadCount)
             } catch (err) {
                 console.error("Ошибка загрузки уведомлений:", err);
             }
         };
 
         fetchUnreadCount();
-        const interval = setInterval(fetchUnreadCount, 5000); 
+        const interval = setInterval(fetchUnreadCount, 5000);
 
         return () => clearInterval(interval);
     }, []);
@@ -67,6 +69,8 @@ const Header = ({ setCurrentPage, currentPage }: { setCurrentPage: (page: Page) 
         setShowNotifications(!showNotifications);
         if (!showNotifications) {
             try {
+                console.log('Проверка авторизации перед загрузкой уведомлений:', isAuthenticated);
+
                 if (!isAuthenticated) {
                     throw new Error('Требуется авторизация');
                 }
@@ -79,8 +83,10 @@ const Header = ({ setCurrentPage, currentPage }: { setCurrentPage: (page: Page) 
                         'Authorization': `Bearer ${token}`
                     },
                 });
+
                 const data = await response.json();
-                setNotifications(data.items || []);
+                console.log('Загруженные уведомления:', data);
+                setNotifications(data || []);
             } catch (err) {
                 console.error('Ошибка загрузки уведомлений:', err);
             }
@@ -119,21 +125,23 @@ const Header = ({ setCurrentPage, currentPage }: { setCurrentPage: (page: Page) 
                         </div>
                     )}
                     {showNotifications && (
-                        <div className={styles.notificationsPopup}>
-                            {notifications.length === 0 ? (
-                                <div className={styles.empty}>Уведомлений нет</div>
-                            ) : (
-                                notifications.map(notification => (
-                                    <div key={notification.id} className={styles.notificationItem}>
-                                        <div className={styles.notificationText}>
-                                            <strong>{notification.title}</strong>
-                                            <p>{notification.message}</p>
-                                            <span className={styles.date}>{new Date(notification.createdAt).toLocaleString()}</span>
+                        <div className={styles.overlay} onClick={() => setShowNotifications(false)}>
+                            <div className={styles.notificationsPopup}>
+                                {notifications.length === 0 ? (
+                                    <div className={styles.empty}>Уведомлений нет</div>
+                                ) : (
+                                    notifications.map(notification => (
+                                        <div key={notification.id} className={styles.notificationItem}>
+                                            <div className={styles.notificationText}>
+                                                <strong>{notification.title}</strong>
+                                                <p>{notification.message}</p>
+                                                <span className={styles.date}>{new Date(notification.createdAt).toLocaleString()}</span>
+                                            </div>
+                                            {!notification.isRead && <div className={styles.unreadDot}></div>}
                                         </div>
-                                        {!notification.isRead && <div className={styles.unreadDot}></div>}
-                                    </div>
-                                ))
-                            )}
+                                    ))
+                                )}
+                            </div>
                         </div>
                     )}
                     <img

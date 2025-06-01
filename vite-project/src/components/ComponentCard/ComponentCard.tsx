@@ -138,7 +138,7 @@ export const ComponentCard = ({ component, onSelect, selected }: ComponentCardPr
         }
       }
 
-
+      console.log(response)
     } catch (error) {
       console.error('Ошибка при подписке:', error);
     }

@@ -23,7 +23,7 @@
 .icon {
     width: 30px;
     height: 30px;
-    
+
 }
 
 .iconActive {
@@ -39,11 +39,10 @@
     /* margin-bottom: 5px; */
 }
 
-.notificationIcon{
+.notificationIcon {
     width: 27px;
     height: 27px;
     filter: brightness(0) invert(1);
-    margin-right: 40px;
     margin-bottom: 2px;
 }
 
@@ -101,22 +100,27 @@
     color: var(--tab-active);
 }
 
-.navigation{
+.navigation {
     gap: 30px;
     display: flex;
 }
 
 .notificationWrapper {
     position: relative;
+    display: flex;
+    flex-direction: row;
+    margin-right: 40px;
 }
 
 .notificationDot {
-    position: absolute;
+    /* position: absolute;
     top: 0;
-    right: 0;
+    right: 0; */
     background-color: red;
-    width: 10px;
-    height: 10px;
+    width: 15px;
+    height: 15px;
+    z-index: 100px;
+    margin-left: -10px;
     border-radius: 50%;
 }
 
@@ -131,7 +135,7 @@
     border-radius: 8px;
     padding: 10px;
     z-index: 1000;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
 .notificationItem {
@@ -155,7 +159,19 @@
     color: gray;
 }
 
-.icons{
+.icons {
     display: flex;
     flex-direction: row;
+}
+
+.overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
 }

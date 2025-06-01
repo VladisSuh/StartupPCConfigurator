@@ -11,7 +11,10 @@
   --bg-secondary: #1b1b1b;
   --bg-tertiary: #222222;
   --divider: rgba(255, 255, 255, 0.2);
-  --blue: #1647d0;
+  --border:rgba(255, 255, 255, 0.1);
+  --tab-active-border: #2dce989d;
+  --button-bg: rgba(0, 0, 0, 0.226);
+  --blue: #a73cff;
   --text-primary: #ffffff;
   --text-secondary: #9e9e9e;
   --orange: #fad73d;
