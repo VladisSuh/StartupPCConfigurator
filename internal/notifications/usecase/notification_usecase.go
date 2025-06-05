@@ -20,7 +20,7 @@ type NotificationUseCase interface {
 	GetUnreadCount(ctx context.Context, userID uuid.UUID) (int, error)
 
 	// Список уведомлений для пользователя
-	ListNotifications(ctx context.Context, userID uuid.UUID) ([]domain.Notification, error)
+	ListNotifications(ctx context.Context, userID uuid.UUID, page, pageSize int) (domain.PagedNotifications, error)
 
 	// Отметить уведомление как прочитанное
 	MarkAsRead(ctx context.Context, userID, notifID uuid.UUID) error
@@ -86,13 +86,20 @@ func (uc *notificationUseCase) GetUnreadCount(ctx context.Context, userID uuid.U
 }
 
 // ListNotifications возвращает список уведомлений из БД
-func (uc *notificationUseCase) ListNotifications(ctx context.Context, userID uuid.UUID) ([]domain.Notification, error) {
-	notifs, err := uc.repo.ListNotifications(ctx, userID)
+func (uc *notificationUseCase) ListNotifications(ctx context.Context, userID uuid.UUID, page, pageSize int) (domain.PagedNotifications, error) {
+	rows, total, err := uc.repo.ListNotifications(ctx, userID, page, pageSize)
 	if err != nil {
 		uc.logger.Printf("ListNotifications error: %v", err)
-		return nil, err
+		return domain.PagedNotifications{}, err
 	}
-	return notifs, nil
+
+	// Собираем PagedNotifications
+	return domain.PagedNotifications{
+		Items:    rows,
+		Total:    total,
+		Page:     page,
+		PageSize: pageSize,
+	}, nil
 }
 
 // MarkAsRead помечает уведомление как прочитанное

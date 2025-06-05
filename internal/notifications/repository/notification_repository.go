@@ -15,7 +15,7 @@ import (
 type NotificationRepository interface {
 	GetSubscribers(ctx context.Context, componentID string) ([]uuid.UUID, error)
 	CreateNotification(ctx context.Context, n domain.Notification) error
-	ListNotifications(ctx context.Context, userID uuid.UUID) ([]domain.Notification, error)
+	ListNotifications(ctx context.Context, userID uuid.UUID, page, pageSize int) ([]domain.NotificationResponse, int, error)
 	MarkAsRead(ctx context.Context, userID, notifID uuid.UUID) error
 	Subscribe(ctx context.Context, userID uuid.UUID, componentID string) error
 	Unsubscribe(ctx context.Context, userID uuid.UUID, componentID string) error
@@ -71,29 +71,71 @@ VALUES
 }
 
 // ListNotifications fetches all notifications for a user
-func (r *repoImpl) ListNotifications(ctx context.Context, userID uuid.UUID) ([]domain.Notification, error) {
+// ListNotifications возвращает с джойном по components страницу уведомлений и общее число записей
+func (r *repoImpl) ListNotifications(
+	ctx context.Context,
+	userID uuid.UUID,
+	page, pageSize int,
+) ([]domain.NotificationResponse, int, error) {
+	// 1) Считаем общее число уведомлений (без LIMIT/OFFSET)
+	var total int
+	if err := r.db.QueryRowContext(ctx,
+		"SELECT COUNT(*) FROM notifications WHERE user_id = $1", userID,
+	).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	// 2) Основной SELECT с JOIN-ом на components
 	const query = `
-SELECT id, user_id, component_id, shop_id, old_price, new_price, is_read, created_at
-FROM notifications
-WHERE user_id = $1
-ORDER BY created_at DESC
-`
-	rows, err := r.db.QueryContext(ctx, query, userID)
+    SELECT
+        n.id,
+        n.component_id,
+        c.name           AS component_name,
+        c.category       AS component_category,
+        n.shop_id,
+        n.old_price,
+        n.new_price,
+        n.is_read,
+        n.created_at
+    FROM notifications n
+    JOIN components c ON c.id = n.component_id::integer
+    WHERE n.user_id = $1
+    ORDER BY n.created_at DESC
+    LIMIT $2 OFFSET $3
+    `
+	offset := (page - 1) * pageSize
+	rows, err := r.db.QueryContext(ctx, query,
+		userID, pageSize, offset,
+	)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	defer rows.Close()
 
-	var result []domain.Notification
+	var out []domain.NotificationResponse
 	for rows.Next() {
-		var n domain.Notification
-		if err := rows.Scan(&n.ID, &n.UserID, &n.ComponentID,
-			&n.ShopID, &n.OldPrice, &n.NewPrice, &n.IsRead, &n.CreatedAt); err != nil {
-			return nil, err
+		var nr domain.NotificationResponse
+		// у нас структура NotificationResponse: ID, ComponentID, ComponentName, ComponentCategory, ShopID, OldPrice, NewPrice, IsRead, CreatedAt
+		if err := rows.Scan(
+			&nr.ID,
+			&nr.ComponentID,
+			&nr.ComponentName,
+			&nr.ComponentCategory,
+			&nr.ShopID,
+			&nr.OldPrice,
+			&nr.NewPrice,
+			&nr.IsRead,
+			&nr.CreatedAt,
+		); err != nil {
+			return nil, 0, err
 		}
-		result = append(result, n)
+		out = append(out, nr)
 	}
-	return result, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
+	}
+
+	return out, total, nil
 }
 
 // MarkAsRead sets a notification's is_read flag to true
