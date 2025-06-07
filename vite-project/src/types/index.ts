@@ -2,7 +2,7 @@
 export interface Component {
     id: string;
     name: string;
-    category: string;
+    category: CategoryType;
     brand: string;
     specs: Record<string, string>;
 }
@@ -129,11 +129,11 @@ export interface OffersListProps {
     offers: Offer[];
 }
 
-export type Page = 'configurator' | 'account';
+export type Page = 'configurator' | 'account' | 'usecases';
 
 
 export type ResponseComponent = {
-    category: string;
+    category: CategoryType;
     id: string;
     name: string;
     specs: Record<string, string>;
@@ -143,14 +143,21 @@ export type Configuration = {
     ID: string;
     Name: string;
     OwnerId: string;
-    components: ResponseComponent[];
+    components: Component[];
     CreatedAt: string;
     UpdatedAt: string;
 };
 
 export type Configurations = Configuration[];
 
+export type UsecaseObject = {
+    name: string;
+    components: Component[];
+};
 
+export type UsecasesResponse = {
+    components: UsecaseObject[];
+}
 
 export type UsecaseType =
     | 'all'
@@ -192,3 +199,13 @@ export const UsecaseLabels: Record<UsecaseType, string> = {
     enthusiast: "Топовая сборка",
     nas: "Домашний сервер",
 };
+
+
+export type Notification = {
+    id: string;
+    userId: string;
+    title: string;
+    message: string;
+    isRead: boolean;
+    createdAt: string; 
+}

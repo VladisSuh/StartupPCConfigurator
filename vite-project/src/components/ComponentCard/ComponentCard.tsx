@@ -63,7 +63,7 @@ export const ComponentCard = ({ component, onSelect, selected }: ComponentCardPr
     try {
       setIsLoading(true);
       setError(null);
-      
+
       if (!isAuthenticated) {
         throw new Error('Требуется авторизация');
       }
@@ -87,11 +87,60 @@ export const ComponentCard = ({ component, onSelect, selected }: ComponentCardPr
         throw new Error(`Ошибка сервера: ${response.status}`);
       }
       const data = await response.json();
+      console.log('оферы:', data);
       setOffers(data || []);
     } catch (err) {
       setError('Не удалось загрузить предложения');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const subscribeToComponent = async () => {
+    try {
+      if (!isAuthenticated) {
+        throw new Error('Требуется авторизация');
+      }
+
+      const token = getToken();
+      console.log('component.id', component.id);
+      console.log('token', token);
+
+      console.log('Отправка запроса на подписку на компонент:', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ componentId: String(component.id) })
+      });
+
+      const response = await fetch('http://localhost:8080/subscriptions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ componentId: String(component.id) })
+      });
+
+      if (!response.ok) {
+        if (response.status === 204) {
+          console.log('Подписка успешно создана');
+        } else if (response.status === 400) {
+          console.log(response)
+          console.error('Некорректные данные для подписки');
+        } else if (response.status === 401) {
+          console.error('Пользователь не авторизован');
+        } else {
+          console.log(response)
+          console.error('Неизвестная ошибка:', response.status);
+        }
+      }
+
+      console.log(response)
+    } catch (error) {
+      console.error('Ошибка при подписке:', error);
     }
   };
 
@@ -121,15 +170,20 @@ export const ComponentCard = ({ component, onSelect, selected }: ComponentCardPr
       </div>
 
       <div className={styles.card__price}>
-        {isLoading ? (
-          'Загрузка...'
-        ) : error ? (
-          'Цена не доступна'
-        ) : minPrice ? (
-          `Цена от ${minPrice.toLocaleString()} ₽`
-        ) : (
-          'Нет в наличии'
-        )}
+        <div>
+          {isLoading ? (
+            'Загрузка...'
+          ) : error ? (
+            'Цена не доступна'
+          ) : minPrice ? (
+            `Цена от ${minPrice.toLocaleString()} ₽`
+          ) : (
+            'Нет в наличии'
+          )}
+        </div>
+
+        <img src='src/assets/bell-icon.png' onClick={subscribeToComponent} className={styles.notificationIcon} alt='подписка на уведомления' title='Подписаться на уведомления' />
+
       </div>
 
       <div className={styles.card__actions}>
@@ -203,6 +257,6 @@ export const ComponentCard = ({ component, onSelect, selected }: ComponentCardPr
           />
         )}
       </Modal>
-    </div>
+    </div >
   );
 }

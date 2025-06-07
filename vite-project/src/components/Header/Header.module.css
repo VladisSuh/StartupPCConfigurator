@@ -23,17 +23,27 @@
 .icon {
     width: 30px;
     height: 30px;
+
 }
 
 .iconActive {
-    fill: rgb(255, 115, 0);
+    fill: var(--tab-active);
 }
 
 .logoutIcon {
-    width: 20px;
-    height: 20px;
+    width: 25px;
+    height: 25px;
     filter: brightness(0) invert(1);
     margin-left: 40px;
+    margin-top: 3px;
+    /* margin-bottom: 5px; */
+}
+
+.notificationIcon {
+    width: 27px;
+    height: 27px;
+    filter: brightness(0) invert(1);
+    margin-bottom: 2px;
 }
 
 .userMenu {
@@ -87,6 +97,81 @@
 
 .active {
     font-weight: bold;
-    color: orange;
-    /* или нужный цвет */
+    color: var(--tab-active);
+}
+
+.navigation {
+    gap: 30px;
+    display: flex;
+}
+
+.notificationWrapper {
+    position: relative;
+    display: flex;
+    flex-direction: row;
+    margin-right: 40px;
+}
+
+.notificationDot {
+    /* position: absolute;
+    top: 0;
+    right: 0; */
+    background-color: red;
+    width: 15px;
+    height: 15px;
+    z-index: 100px;
+    margin-left: -10px;
+    border-radius: 50%;
+}
+
+.notificationsPopup {
+    position: absolute;
+    right: 20px;
+    top: 60px;
+    width: 300px;
+    background-color: #fff;
+    color: #000;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    padding: 10px;
+    z-index: 1000;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.notificationItem {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px;
+    border-bottom: 1px solid #eee;
+}
+
+.unreadDot {
+    width: 8px;
+    height: 8px;
+    background-color: red;
+    border-radius: 50%;
+    margin-left: 10px;
+    align-self: center;
+}
+
+.date {
+    font-size: 0.8rem;
+    color: gray;
+}
+
+.icons {
+    display: flex;
+    flex-direction: row;
+}
+
+.overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
 }

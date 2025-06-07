@@ -1,12 +1,11 @@
 package handlers
 
 import (
-	"log"
-	"net/http"
-	"time"
-
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"log"
+	"net/http"
+	"strconv"
 
 	"StartupPCConfigurator/internal/notifications/usecase"
 )
@@ -57,28 +56,16 @@ func (h *Handler) List(c *gin.Context) {
 		return
 	}
 
-	notifications, err := h.uc.ListNotifications(c.Request.Context(), userID)
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "20"))
+
+	paged, err := h.uc.ListNotifications(c.Request.Context(), userID, page, pageSize)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Преобразуем domain.Notification в JSON-ответ
-	resp := make([]gin.H, 0, len(notifications))
-	for _, n := range notifications {
-		rep := gin.H{
-			"id":          n.ID,
-			"componentId": n.ComponentID,
-			"shopId":      n.ShopID,
-			"oldPrice":    n.OldPrice,
-			"newPrice":    n.NewPrice,
-			"isRead":      n.IsRead,
-			"createdAt":   n.CreatedAt.Format(time.RFC3339),
-		}
-		resp = append(resp, rep)
-	}
-
-	c.JSON(http.StatusOK, resp)
+	c.JSON(http.StatusOK, paged)
 }
 
 // MarkRead обрабатывает POST /notifications/:id/read

@@ -1,9 +1,11 @@
 .container {
     margin-right: 25px;
     margin-bottom: auto;
-    background-color: #1b1b1b;
+    background-color: var(--bg-secondary);
     display: block;
     width: 60%;
+    padding: 10px;
+    border-radius: 5px;
 }
 
 .searchContainer {
@@ -24,14 +26,6 @@
 
 .checkboxLabel input {
     margin-right: 18px;
-    /* или любой другой отступ */
-}
-
-
-.container {
-    background-color: #1e1e1e;
-    padding: 10px;
-    border-radius: 5px;
 }
 
 .tabs {
@@ -66,7 +60,7 @@
 }
 
 .activeTab {
-    color: #ff9f22;
+    color: var(--tab-active);
 }
 
 .brandList {

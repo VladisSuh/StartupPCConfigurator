@@ -1,0 +1,51 @@
+.trashIcon {
+    width: 20px;
+    height: 20px;
+    filter: brightness(0) invert(1);
+    margin-left: 40px;
+    margin-bottom: 5px;
+}
+
+.configuration {
+    background-color: var(--bg-secondary);
+    margin-bottom: 30px;
+    border-radius: 10px;
+}
+
+.configHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 40px;
+}
+
+.configTitle {
+    /* text-align: center; */
+    padding: 10px 0;
+    color: var(--text-secondary);
+    font-size: 16px;
+}
+
+.configName {
+    color: var(--text-primary)
+}
+
+.footer {
+    border-top: 1px solid rgba(255, 255, 255, .2);
+    display: flex;
+    justify-content: flex-end;
+    align-items: flex-end;
+    padding: 12px 40px;
+    font-size: 16px;
+    border-bottom-left-radius: 10px;
+    border-bottom-right-radius: 10px;
+    background-color: var(--bg-tertiary);
+}
+
+.totalContainer {
+    width: 200px;
+}
+
+.totalPrice {
+    width: 200px;
+}

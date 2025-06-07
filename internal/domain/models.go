@@ -117,6 +117,27 @@ type Notification struct {
 	CreatedAt   time.Time `db:"created_at" json:"createdAt"`
 }
 
+// NotificationResponse — структура, отдаваемая в теле GET /notifications
+type NotificationResponse struct {
+	ID                uuid.UUID `json:"id"`
+	ComponentID       string    `json:"componentId"`
+	ComponentName     string    `json:"componentName"`
+	ComponentCategory string    `json:"componentCategory"`
+	ShopID            int64     `json:"shopId"`
+	OldPrice          float64   `json:"oldPrice"`
+	NewPrice          float64   `json:"newPrice"`
+	IsRead            bool      `json:"isRead"`
+	CreatedAt         time.Time `json:"createdAt"`
+}
+
+// PagedNotifications — обёртка с метаданными пагинации
+type PagedNotifications struct {
+	Items    []NotificationResponse `json:"items"`
+	Total    int                    `json:"total"`
+	Page     int                    `json:"page"`
+	PageSize int                    `json:"pageSize"`
+}
+
 // NamedBuild — сборка с названием
 type NamedBuild struct {
 	Name       string      `json:"name"`
