@@ -32,7 +32,7 @@ Content-Type: application/json
 #       "expires_at":   "..."
 #   }
 ################################################################################
-@access_token  = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImtyYXNpbmFfMjAwM0BtYWlsLnJ1IiwiZXhwIjoxNzQ4ODE5MTYyLCJ1c2VyX2lkIjoiMzI5NGRiZWYtM2EyYi00NjY3LTliNDctOGEyMGNkZjljZjhhIn0.SN0612S0YgXRZmqcIKh-G_zAJ1ATOMVnfe7wKzaaD7c
+@access_token  = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImtyYXNpbmFfMjAwM0BtYWlsLnJ1IiwiZXhwIjoxNzQ4ODIxNzQ1LCJ1c2VyX2lkIjoiMzI5NGRiZWYtM2EyYi00NjY3LTliNDctOGEyMGNkZjljZjhhIn0.B47jcbkwrwEOAmKdjHAu8dieVL3uD6LyCO-107QL3L4
 @refresh_token = 1
 ################################################################################
 ### 3. 
@@ -264,15 +264,12 @@ GET {{config_host}}/config/usecases
 GET {{config_host}}/config/usecase/office
 
 
-###GET на агрегатор
-GET http://localhost:8080/offers?
-    componentId=1&
-    sort=priceAsc
+### 19. GET на агрегатор
+GET http://localhost:8080/offers?componentId=1&sort=priceAsc
 Authorization: Bearer {{access_token}}
 
-###GET на минимальную цену агрегатора
-GET http://localhost:8080/offers/min?
-    componentId=12
+### 20. Минимальная цена агрегатора
+GET http://localhost:8080/offers/min?componentId=12
 
 ###################Не работает в REST-тестах
 POST http://localhost:8080/offers/import
@@ -280,13 +277,13 @@ Content-Type: multipart/form-data
 
 file=@./dns_pricelist.xlsx;type=application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
 
-###Post на создание подписки
+### 21. Post на создание подписки
 POST http://localhost:8080/subscriptions
 Content-Type: application/json
 Authorization: Bearer {{access_token}}
 
 {
-  "componentId": "1"
+  "componentId": "1000"
 }
 
 ###Notifications GET на Redis
