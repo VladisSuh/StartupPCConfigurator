@@ -7,9 +7,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
+	"math/rand"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -113,7 +117,8 @@ func (s *configService) FetchCompatibleComponentsMulti(
 	brand *string,
 	usecase *string,
 ) ([]domain.Component, error) {
-	// 1) Получаем «пул» кандидатов по category + опционально brand
+
+	// ---------- 1. Кандидаты по категории + brand ------------------
 	var candidates []domain.Component
 	var err error
 	if brand != nil {
@@ -125,7 +130,7 @@ func (s *configService) FetchCompatibleComponentsMulti(
 		return nil, err
 	}
 
-	// 2) Применяем фильтрацию по сценарию, если он указан
+	// ---------- 2. Pre-filter by use-case --------------------------
 	if usecase != nil && *usecase != "" {
 		rule, ok := rules.ScenarioRules[*usecase]
 		if !ok {
@@ -133,58 +138,38 @@ func (s *configService) FetchCompatibleComponentsMulti(
 		}
 		var filtered []domain.Component
 		for _, comp := range candidates {
+			ok := false
 			switch strings.ToLower(comp.Category) {
 			case "cpu":
-				if cpuMatches(comp, rule) {
-					filtered = append(filtered, comp)
-				}
+				ok = cpuMatches(comp, rule)
 			case "motherboard":
-				if mbMatches(comp, rule) {
-					filtered = append(filtered, comp)
-				}
+				ok = mbMatches(comp, rule)
 			case "ram":
-				if ramMatches(comp, rule) {
-					filtered = append(filtered, comp)
-				}
+				ok = ramMatches(comp, rule)
 			case "gpu":
-				if gpuMatches(comp, rule) {
-					filtered = append(filtered, comp)
-				}
+				ok = gpuMatches(comp, rule)
 			case "psu":
-				if psuMatches(comp, rule) {
-					filtered = append(filtered, comp)
-				}
+				ok = psuMatches(comp, rule)
 			case "case":
-				if caseMatches(comp, rule) {
-					filtered = append(filtered, comp)
-				}
+				ok = caseMatches(comp, rule)
 			case "ssd":
-				if ssdMatches(comp, rule) {
-					filtered = append(filtered, comp)
-				}
-
+				ok = ssdMatches(comp, rule)
+			case "hdd":
+				ok = hddMatches(comp, rule)
 			default:
+				ok = true
+			}
+			if ok {
 				filtered = append(filtered, comp)
 			}
 		}
 		candidates = filtered
 	}
 
-	// 2) Специальная логика для кулеров
-	if strings.EqualFold(category, "cooler") {
-		var filtered []domain.ComponentRef
-		for _, ref := range bases {
-			if strings.EqualFold(ref.Category, "cpu") ||
-				strings.EqualFold(ref.Category, "case") {
-				filtered = append(filtered, ref)
-			}
-		}
-		bases = filtered
-	}
+	// ---------- 3. specsByCat — всё, что уже выбрано ----------------
+	specsByCat := map[string]map[string]interface{}{}
+	totalDraw := 0.0
 
-	// 3) Собираем merged-спецификацию и totalDraw для PSU
-	merged := make(map[string]interface{})
-	var totalDraw float64
 	for _, ref := range bases {
 		base, err := s.repo.GetComponentByName(ref.Category, ref.Name)
 		if err != nil {
@@ -192,59 +177,142 @@ func (s *configService) FetchCompatibleComponentsMulti(
 		}
 		var m map[string]interface{}
 		if err := json.Unmarshal(base.Specs, &m); err != nil {
-			return nil, fmt.Errorf("invalid specs for %s/%s: %w", ref.Category, ref.Name, err)
+			return nil, fmt.Errorf("invalid specs for %s/%s: %w",
+				ref.Category, ref.Name, err)
 		}
-		for k, v := range m {
-			merged[k] = v
-		}
+		specsByCat[strings.ToLower(ref.Category)] = m
+
+		// суммируем power_draw для PSU
 		if strings.EqualFold(category, "psu") &&
 			(strings.EqualFold(ref.Category, "cpu") || strings.EqualFold(ref.Category, "gpu")) {
+
 			if d, ok := m["power_draw"].(float64); ok {
 				totalDraw += d
 			}
 		}
 	}
 
-	// 4) Адаптируем merged-спецификацию под целевую категорию
-	switch strings.ToLower(category) {
-	case "case":
-		if h, ok := merged["cooler_height"]; ok {
-			merged["cooler_max_height"] = h
-		}
-	case "gpu":
-		if v, ok := merged["pcie_version"]; ok {
-			merged["interface"] = v
-		}
-	case "psu":
-		merged = map[string]interface{}{"power": totalDraw + 150}
-	case "ssd":
-		if v, ok := merged["pcie_version"]; ok {
-			merged["interface"] = v
-		} else if _, ok := merged["sata_ports"]; ok {
-			merged["interface"] = "SATA III"
-		}
-		if slots, ok := merged["m2_slots"].(float64); ok && slots >= 1 {
-			merged["form_factor"] = "M.2"
-		} else {
-			merged["form_factor"] = "2.5"
-		}
-	case "cooler":
-		height, _ := merged["cooler_max_height"]
-		socket, _ := merged["socket"]
-		merged = map[string]interface{}{
-			"socket":    socket,
-			"height_mm": height,
+	// ---------- 3-bis. Доп. фильтр только для HDD -------------------
+	if strings.EqualFold(category, "hdd") {
+		// если выбран корпус, смотрим, есть ли 3.5″-отсеки
+		if csSpecs, ok := specsByCat["case"]; ok {
+			bays3, _ := csSpecs["drive_bays_3_5"].(float64)
+
+			// если отсеков нет, убираем все 3.5″ диски из candidates
+			if bays3 < 1 {
+				tmp := candidates[:0] // переиспользуем срез без аллокации
+				for _, c := range candidates {
+					var s struct {
+						Form string `json:"form_factor"`
+					}
+					_ = json.Unmarshal(c.Specs, &s)
+					if !strings.EqualFold(s.Form, "3.5") {
+						tmp = append(tmp, c)
+					}
+				}
+				candidates = tmp
+			}
 		}
 	}
 
-	// 5) Фильтруем наш пул по совместимости с учётом merged specs
-	filter := domain.CompatibilityFilter{
+	// ---------- 4. Собираем filter-map только из нужных полей -------
+	filterSpecs := buildFilterForCategory(category, specsByCat, totalDraw)
+
+	// ---------- 5. Фильтрация кандидатов ----------------------------
+	return s.repo.FilterPoolByCompatibility(candidates, domain.CompatibilityFilter{
 		Category: category,
-		Specs:    merged,
-	}
-	return s.repo.FilterPoolByCompatibility(candidates, filter)
+		Specs:    filterSpecs,
+	})
 }
 
+// ------------------------------------------------------------------
+// buildFilterForCategory – единая точка, где мы решаем,
+// какие поля действительно проверять для каждой категории.
+// ------------------------------------------------------------------
+func buildFilterForCategory(
+	target string,
+	specsByCat map[string]map[string]interface{},
+	totalDraw float64,
+) map[string]interface{} {
+
+	switch strings.ToLower(target) {
+
+	case "case":
+		out := map[string]interface{}{}
+		if mb, ok := specsByCat["motherboard"]; ok {
+			out["form_factor"] = mb["form_factor"]
+		}
+		if cpu, ok := specsByCat["cpu"]; ok {
+			out["cooler_max_height"] = cpu["cooler_height"]
+		}
+		if gpu, ok := specsByCat["gpu"]; ok {
+			out["gpu_max_length"] = gpu["length_mm"]
+		}
+		if bays, ok := specsByCat["hdd"]["form_factor"]; ok && bays == "3.5" {
+			// если уже выбран 3.5" HDD – нужен хотя бы один 3.5-бэй
+			out["drive_bays_3_5"] = 1.0
+		}
+		return out
+
+	case "gpu":
+		if mb, ok := specsByCat["motherboard"]; ok {
+			return map[string]interface{}{
+				"interface": mb["pcie_version"],
+			}
+		}
+		return nil
+
+	case "ssd":
+		if mb, ok := specsByCat["motherboard"]; ok {
+			ff := "2.5"
+			if slots, _ := mb["m2_slots"].(float64); slots >= 1 {
+				ff = "M.2"
+			}
+			if v, ok := mb["pcie_version"]; ok {
+				return map[string]interface{}{
+					"interface":   v,
+					"form_factor": ff,
+				}
+			}
+			return map[string]interface{}{
+				"interface":   "SATA III",
+				"form_factor": ff,
+			}
+		}
+		return nil
+
+	case "hdd":
+		out := map[string]interface{}{"interface": "SATA III"}
+		if mb, ok := specsByCat["motherboard"]; ok {
+			out["sata_ports"] = mb["sata_ports"]
+		}
+		if cs, ok := specsByCat["case"]; ok {
+			out["drive_bays_3_5"] = cs["drive_bays_3_5"]
+		}
+		return out
+
+	case "psu":
+		return map[string]interface{}{"power": totalDraw + 150}
+
+	case "cooler":
+		mbSocket := ""
+		if cpu, ok := specsByCat["cpu"]; ok {
+			mbSocket, _ = cpu["socket"].(string)
+		}
+		maxH := 0.0
+		if cs, ok := specsByCat["case"]; ok {
+			maxH, _ = cs["cooler_max_height"].(float64)
+		}
+		return map[string]interface{}{
+			"socket":    mbSocket,
+			"height_mm": maxH,
+		}
+
+	default:
+		// для прочих категорий ничего особого не нужно
+		return nil
+	}
+}
 func (s *configService) CreateConfiguration(userId uuid.UUID, name string, refs []domain.ComponentRef) (domain.Configuration, error) {
 	if name == "" {
 		return domain.Configuration{}, errors.New("name is required")
@@ -326,115 +394,209 @@ func (s *configService) ListBrands(category string) ([]string, error) {
 	return s.repo.GetBrandsByCategory(category)
 }
 
-func (s *configService) GetUseCaseBuild(usecaseName string, limit int) ([]domain.NamedBuild, error) {
-	rule, ok := rules.ScenarioRules[usecaseName]
-	if !ok {
-		return nil, fmt.Errorf("unknown use case %q", usecaseName)
+// ========== вспом. кэш ===============
+var specCache = sync.Map{} // id -> map[string]interface{}
+
+func specs(c domain.Component) map[string]interface{} {
+	if v, ok := specCache.Load(c.ID); ok {
+		return v.(map[string]interface{})
 	}
+	m := parseSpecs(c.Specs)
+	specCache.Store(c.ID, m)
+	return m
+}
+
+// mini-ключ для пары «форм-фактор корпуса / форм-фактор платы»
+type ffPair struct{ caseFF, mbFF string }
+
+// дикт, в котором TRUE означает «плата mbFF физически помещается в корпус caseFF»
+var formOK = map[ffPair]bool{
+	{"ATX", "ATX"}:       true,
+	{"ATX", "MICRO-ATX"}: true,
+	{"ATX", "MINI-ITX"}:  true,
+
+	{"MICRO-ATX", "MICRO-ATX"}: true,
+	{"MICRO-ATX", "MINI-ITX"}:  true,
+
+	{"MINI-ITX", "MINI-ITX"}: true,
+}
+
+// ==========================================================================
+// helpers.go (или в том же файле — как удобнее)
+// -------------------------------------------------------------------------
+// заглушка + усечение «второстепенных» пулов (GPU / SSD / HDD)
+func capped(list []domain.Component, need bool, max int) []domain.Component {
+	if !need { // вес = 0  →  только пустышка
+		return []domain.Component{{}}
+	}
+	if max > 0 && len(list) > max { // обрезаем хвост
+		list = list[:max]
+	}
+	return append([]domain.Component{{}}, list...)
+}
+
+// усечение «обязательных» пулов (CPU / MB / RAM / PSU / Case)
+func capPrimary(list []domain.Component, max int) []domain.Component {
+	if max > 0 && len(list) > max {
+		rand.Shuffle(len(list), func(i, j int) { list[i], list[j] = list[j], list[i] })
+		return list[:max]
+	}
+	return list
+}
+
+// быстрый ключ без sort.Slice / аллокаций
+func fastKey(combo []domain.Component) string {
+	var b strings.Builder
+	for _, c := range combo { // порядок фиксирован: CPU, MB, RAM…
+		if c.ID == 0 {
+			continue
+		} // пропускаем «заглушки»
+		b.WriteString(c.Category) // category уже в правильном регистре
+		b.WriteByte(':')
+		b.WriteString(strconv.Itoa(c.ID))
+		b.WriteByte(';')
+	}
+	return b.String()
+}
+
+func init() { rand.Seed(time.Now().UnixNano()) }
+
+// ==========================================================================
+// service.go  (обновлённая GetUseCaseBuild)
+// --------------------------------------------------------------------------
+
+func (s *configService) GetUseCaseBuild(usecase string, limit int) ([]domain.NamedBuild, error) {
+	rule, ok := rules.ScenarioRules[usecase]
+	if !ok {
+		return nil, fmt.Errorf("unknown use-case %q", usecase)
+	}
+
+	/* ---------- 1. загрузка и грубый пред-фильтр ---------- */
 
 	all, err := s.repo.GetComponents("", "", "")
 	if err != nil {
 		return nil, fmt.Errorf("failed to load components: %w", err)
 	}
 
-	// 1) Пред-фильтрация по категориям
-	var cpus, mbs, rams, psus, cases, gpus, ssds []domain.Component
+	bkt := map[string][]domain.Component{}
 	for _, c := range all {
 		switch strings.ToLower(c.Category) {
 		case "cpu":
 			if cpuMatches(c, rule) {
-				cpus = append(cpus, c)
+				bkt["cpu"] = append(bkt["cpu"], c)
 			}
 		case "motherboard":
-			if mbMatches(c, rule) { // NEW: фильтрация плат сразу
-				mbs = append(mbs, c)
+			if mbMatches(c, rule) {
+				bkt["motherboard"] = append(bkt["motherboard"], c)
 			}
 		case "ram":
 			if ramMatches(c, rule) {
-				rams = append(rams, c)
+				bkt["ram"] = append(bkt["ram"], c)
 			}
 		case "psu":
 			if psuMatches(c, rule) {
-				psus = append(psus, c)
+				bkt["psu"] = append(bkt["psu"], c)
 			}
 		case "case":
 			if caseMatches(c, rule) {
-				cases = append(cases, c)
+				bkt["case"] = append(bkt["case"], c)
 			}
 		case "gpu":
 			if gpuMatches(c, rule) {
-				gpus = append(gpus, c)
+				bkt["gpu"] = append(bkt["gpu"], c)
 			}
 		case "ssd":
 			if ssdMatches(c, rule) {
-				ssds = append(ssds, c)
+				bkt["ssd"] = append(bkt["ssd"], c)
+			}
+		case "hdd":
+			if hddMatches(c, rule) {
+				bkt["hdd"] = append(bkt["hdd"], c)
 			}
 		}
 	}
 
-	// 1-бис) GPU/SSD опциональны, только если это правда нужно
-	gpuPool := gpus
-	if rule.MinGPUMemory == 0 {
-		gpuPool = append([]domain.Component{{}}, gpuPool...)
-	}
-	ssdPool := ssds
-	if rule.MinSSDThroughput == 0 {
-		ssdPool = append([]domain.Component{{}}, ssdPool...)
+	/* ---------- 1-bis. формируем пулы с ограничением размера ---------- */
+
+	w := scenarioWeights[usecase]
+	gpus := capped(bkt["gpu"], w.GPU > 0, 4) // ≤ 4 вариантов
+	ssds := capped(bkt["ssd"], w.SSD > 0, 3) // ≤ 3 вариантов
+	hdds := capped(bkt["hdd"], w.HDD > 0, 2) // ≤ 2 вариантов
+
+	cpus := capPrimary(bkt["cpu"], 5) // ≤ 5 CPU
+	mbs := capPrimary(bkt["motherboard"], 5)
+	rams := capPrimary(bkt["ram"], 5)
+	psus := capPrimary(bkt["psu"], 4)
+	cases := capPrimary(bkt["case"], 4)
+
+	/* ---------- 2. комбинаторика с ранними continue ---------- */
+
+	seen := map[string]struct{}{}
+	ranked := map[int][]domain.Component{}
+	closed := 0 // сколько разных рангов уже заполнено
+
+	// подготовим соответствие «форма корпуса → набор плат, которые влезут»
+	fits := make(map[ffPair]bool, len(formOK))
+	for k, v := range formOK {
+		fits[k] = v
 	}
 
-	seen := make(map[string]struct{})
-	ranked := make(map[int][]domain.Component)
-	need := limit
-
-	// 2) Генерация комбинаций
 	for _, cpu := range cpus {
-		specCPU := parseSpecs(cpu.Specs) // MOVED: парсим один раз
+		scpu := specs(cpu)
+
 		for _, mb := range mbs {
-			specMB := parseSpecs(mb.Specs)
-			// NEW: проверяем совместимость сокетов
-			if specCPU["socket"] != specMB["socket"] {
+			if scpu["socket"] != specs(mb)["socket"] {
 				continue
 			}
 
 			for _, ram := range rams {
 				for _, psu := range psus {
+
 					for _, cs := range cases {
-						specsCase := parseSpecs(cs.Specs)
-						// MB ↔ Case
-						if !contains(caseSupportedMap[strings.ToUpper(specsCase["form_factor"].(string))],
-							specMB["form_factor"].(string)) {
+						// внутри комбинаторного цикла:
+						fc := strings.ToUpper(specs(cs)["form_factor"].(string))
+						fm := strings.ToUpper(specs(mb)["form_factor"].(string))
+						if !formOK[ffPair{fc, fm}] {
 							continue
 						}
 
-						// GPU / SSD
-						for _, gpu := range gpuPool {
-							for _, ssd := range ssdPool {
-
-								combo := []domain.Component{cpu, mb, ram, psu, cs}
-								if gpu.ID != 0 {
-									combo = append(combo, gpu)
-								}
-								if ssd.ID != 0 {
-									combo = append(combo, ssd)
-								}
-
-								// дедуп по «ключевым» категориям
-								h := hashCombo(combo)
-								if _, ok := seen[h]; ok {
+						for _, gpu := range gpus {
+							if w.GPU == 0 && gpu.ID != 0 {
+								continue
+							}
+							for _, ssd := range ssds {
+								if w.SSD == 0 && ssd.ID != 0 {
 									continue
 								}
-								seen[h] = struct{}{}
+								for _, hdd := range hdds {
+									if w.HDD == 0 && hdd.ID != 0 {
+										continue
+									}
 
-								// ранжирование
-								rank := rankBuildByScenario(rule, combo, usecaseName)
-								if rank >= len(buildLabels) {
-									rank = len(buildLabels) - 1
-								}
-								if _, ok := ranked[rank]; !ok {
-									ranked[rank] = combo
-									need--
-									if need == 0 {
-										goto DONE
+									combo := []domain.Component{cpu, mb, ram, psu, cs}
+									if gpu.ID != 0 {
+										combo = append(combo, gpu)
+									}
+									if ssd.ID != 0 {
+										combo = append(combo, ssd)
+									}
+									if hdd.ID != 0 {
+										combo = append(combo, hdd)
+									}
+
+									key := fastKey(combo)
+									if _, ok := seen[key]; ok {
+										continue
+									}
+									seen[key] = struct{}{}
+
+									r := rankBuildByScenario(rule, combo, usecase)
+									if _, ok := ranked[r]; !ok {
+										ranked[r] = combo
+										closed++
+										if closed == limit {
+											goto DONE
+										}
 									}
 								}
 							}
@@ -445,19 +607,25 @@ func (s *configService) GetUseCaseBuild(usecaseName string, limit int) ([]domain
 		}
 	}
 DONE:
-
 	if len(ranked) == 0 {
-		return nil, fmt.Errorf("no builds found for use case %q", usecaseName)
+		return nil, fmt.Errorf("no builds for %s", usecase)
 	}
 
-	// 3) Возвращаем от 0-го до limit-1-го ранга
-	var out []domain.NamedBuild
-	for i := 0; i < limit; i++ {
-		if combo, ok := ranked[i]; ok {
-			out = append(out, domain.NamedBuild{Name: buildLabels[i], Components: combo})
+	/* ---------- 3. собираем ответ ---------- */
+
+	out := make([]domain.NamedBuild, 0, len(buildLabels))
+	for i := 0; i < len(buildLabels); i++ {
+		if c, ok := ranked[i]; ok {
+			out = append(out, domain.NamedBuild{buildLabels[i], c})
 		}
 	}
 	return out, nil
+}
+
+/* ----------  init() для сидирования rand  ---------- */
+
+func init() {
+	rand.Seed(time.Now().UnixNano()) // ★ NEW: чтобы Shuffle был непредсказуемым
 }
 
 var caseSupportedMap = map[string][]string{
@@ -600,42 +768,61 @@ func ssdMatches(c domain.Component, rule rules.ScenarioRule) bool {
 	return false
 }
 
+func hddMatches(c domain.Component, rule rules.ScenarioRule) bool {
+	var specs struct {
+		CapacityGB float64 `json:"capacity_gb"`
+		Interface  string  `json:"interface"`
+	}
+	if err := json.Unmarshal(c.Specs, &specs); err != nil {
+		return false
+	}
+
+	// 1) интерфейс ― любой SATA-вариант
+	if !strings.HasPrefix(strings.ToUpper(specs.Interface), "SATA") {
+		return false
+	}
+
+	// 2) диапазон ёмкости
+	capGB := int(specs.CapacityGB)
+	return capGB >= rule.MinHDDCapacity && capGB <= rule.MaxHDDCapacity
+}
+
 // веса одного сценария
 type Weights struct {
-	CPU, GPU, RAM, SSD, PSU float64
+	CPU, GPU, RAM, SSD, HDD, PSU float64
 }
 
 // глобальная карта «сценарий → веса»
 var scenarioWeights = map[string]Weights{
 	"office": {
-		CPU: 1, GPU: 0.5, RAM: 1, SSD: 0.5, PSU: 0.5,
-	},
-	"gaming": {
-		CPU: 3, GPU: 5, RAM: 2, SSD: 2, PSU: 1,
+		CPU: 1, GPU: 0.5, RAM: 1, SSD: 0.5, HDD: 0, PSU: 0.5, // офисному ПК хватит SSD
 	},
 	"htpc": {
-		CPU: 2, GPU: 1, RAM: 1, SSD: 1, PSU: 0.5,
+		CPU: 2, GPU: 1, RAM: 1, SSD: 1, HDD: 1, PSU: 0.5, // медиаплееру нужен объём для фильмов
+	},
+	"gaming": {
+		CPU: 3, GPU: 5, RAM: 2, SSD: 2, HDD: 0, PSU: 1, // игры на SSD
 	},
 	"streamer": {
-		CPU: 4, GPU: 3, RAM: 3, SSD: 2, PSU: 1.5,
+		CPU: 4, GPU: 3, RAM: 3, SSD: 2, HDD: 0, PSU: 1.5, // стримы с SSD
 	},
 	"design": {
-		CPU: 3, GPU: 4, RAM: 2, SSD: 1, PSU: 1,
+		CPU: 3, GPU: 4, RAM: 2, SSD: 1, HDD: 1, PSU: 1, // дизайн-файлы могут быть крупными
 	},
 	"video": {
-		CPU: 4, GPU: 5, RAM: 4, SSD: 2, PSU: 1.5,
+		CPU: 4, GPU: 5, RAM: 4, SSD: 2, HDD: 2, PSU: 1.5, // видеопроекты занимают много места
 	},
 	"cad": {
-		CPU: 4, GPU: 3, RAM: 4, SSD: 2, PSU: 1,
+		CPU: 4, GPU: 3, RAM: 4, SSD: 2, HDD: 0, PSU: 1, // CAD-модели требуют и скорость, и объём
 	},
 	"dev": {
-		CPU: 3, GPU: 1, RAM: 3, SSD: 2, PSU: 1,
+		CPU: 3, GPU: 1, RAM: 3, SSD: 2, HDD: 0.5, PSU: 1, // виртуалки на SSD, но полезен резерв на HDD
 	},
 	"enthusiast": {
-		CPU: 4, GPU: 5, RAM: 3, SSD: 1.5, PSU: 1,
+		CPU: 4, GPU: 5, RAM: 3, SSD: 1.5, HDD: 0, PSU: 1, // главное — производительность
 	},
 	"nas": {
-		CPU: 1, GPU: 0.5, RAM: 2, SSD: 1, PSU: 1,
+		CPU: 1, GPU: 0.5, RAM: 2, SSD: 1, HDD: 1, PSU: 1, // основной сценарий для HDD
 	},
 }
 
@@ -689,6 +876,16 @@ func rankBuildByScenario(rule rules.ScenarioRule, combo []domain.Component, scen
 		total += w.SSD
 	}
 
+	// ---------- HDD ----------
+	if w.HDD > 0 {
+		if hdd := get("hdd"); hdd != nil {
+			cap := toInt(parseSpecs(hdd.Specs)["capacity_gb"])
+			s := normalize(cap, rule.MinHDDCapacity, rule.MaxHDDCapacity)
+			score += s * w.HDD
+			total += w.HDD
+		}
+	}
+
 	// ---------- PSU ----------
 	if psu := get("psu"); psu != nil {
 		specP := parseSpecs(psu.Specs)
@@ -713,8 +910,11 @@ func rankBuildByScenario(rule rules.ScenarioRule, combo []domain.Component, scen
 	}
 	avg := score / total
 
-	// 0..1 делим на 5 интервалов
-	return int(avg * 5) // 0–4 автоматически
+	bucket := int(math.Round(avg * 4)) // 0..4
+	if bucket > 4 {
+		bucket = 4
+	}
+	return bucket // 0..1 делим на 5 интервалов
 }
 
 // helper

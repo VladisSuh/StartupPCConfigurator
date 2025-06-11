@@ -1,7 +1,6 @@
 package repository
 
 import (
-	"StartupPCConfigurator/internal/config/usecase/rules"
 	"StartupPCConfigurator/internal/domain"
 	"database/sql"
 	"fmt"
@@ -25,7 +24,6 @@ type ConfigRepository interface {
 	GetComponentByID(category, id string) (domain.Component, error)
 	GetComponentByName(category, name string) (domain.Component, error)
 	GetUseCases() ([]domain.UseCase, error)
-	GetComponentsByUseCase(usecaseName string) ([]domain.Component, error)
 	GetBrandsByCategory(category string) ([]string, error)
 	GetComponentsByFilters(category string, brand *string) ([]domain.Component, error)
 	GetComponentsByCategory(category string) ([]domain.Component, error)
@@ -198,18 +196,22 @@ func (r *configRepository) CreateConfiguration(
 		}
 	}
 
+	// Стало так:
 	refs := make([]domain.ComponentRef, 0, len(components))
 	for _, c := range components {
 		refs = append(refs, domain.ComponentRef{
-			Category: c.Category,
+			ID:       c.ID,
 			Name:     c.Name,
+			Category: c.Category,
+			Brand:    c.Brand,
+			Specs:    c.Specs,
 		})
 	}
 
 	return domain.Configuration{
 		ID:         configID,
 		Name:       name,
-		OwnerID:    userId,
+		UserID:     userId,
 		Components: refs,
 		CreatedAt:  createdAt,
 		UpdatedAt:  updatedAt,
@@ -241,7 +243,7 @@ func (r *configRepository) UpdateConfiguration(
 	`
 	err = tx.QueryRow(queryCheck, configId).Scan(
 		&existing.ID,
-		&existing.OwnerID,
+		&existing.UserID,
 		&existing.Name,
 		&existing.CreatedAt,
 		&existing.UpdatedAt,
@@ -252,7 +254,7 @@ func (r *configRepository) UpdateConfiguration(
 		return domain.Configuration{}, err
 	}
 
-	if existing.OwnerID != userId {
+	if existing.UserID != userId {
 		return domain.Configuration{}, domain.ErrForbidden
 	}
 
@@ -291,7 +293,7 @@ func (r *configRepository) UpdateConfiguration(
 	// обновим время конфигурации
 	err = tx.QueryRow(queryCheck, configId).Scan(
 		&existing.ID,
-		&existing.OwnerID,
+		&existing.UserID,
 		&existing.Name,
 		&existing.CreatedAt,
 		&existing.UpdatedAt,
@@ -305,12 +307,15 @@ func (r *configRepository) UpdateConfiguration(
 		refs = append(refs, domain.ComponentRef{
 			Category: c.Category,
 			Name:     c.Name,
+			Brand:    c.Brand,
+			Specs:    c.Specs,
+			ID:       c.ID,
 		})
 	}
 
 	updatedConfig := domain.Configuration{
 		ID:         existing.ID,
-		OwnerID:    existing.OwnerID,
+		UserID:     existing.UserID,
 		Name:       existing.Name,
 		CreatedAt:  existing.CreatedAt,
 		UpdatedAt:  existing.UpdatedAt,
@@ -336,13 +341,13 @@ func (r *configRepository) GetUserConfigurations(userId uuid.UUID) ([]domain.Con
 	var configs []domain.Configuration
 	for rows.Next() {
 		var cfg domain.Configuration
-		cfg.OwnerID = userId
+		cfg.UserID = userId
 		if err := rows.Scan(&cfg.ID, &cfg.Name, &cfg.CreatedAt, &cfg.UpdatedAt); err != nil {
 			return nil, err
 		}
 
 		compQuery := `
-		SELECT c.name, c.category, c.id, c.specs
+		SELECT c.name, c.category, c.brand, c.id, c.specs
 		FROM configuration_components cc
 		JOIN components c ON cc.component_id = c.id
 		WHERE cc.config_id = $1
@@ -353,7 +358,7 @@ func (r *configRepository) GetUserConfigurations(userId uuid.UUID) ([]domain.Con
 		}
 		for compRows.Next() {
 			var ref domain.ComponentRef
-			if err := compRows.Scan(&ref.Name, &ref.Category, &ref.ID, &ref.Specs); err != nil {
+			if err := compRows.Scan(&ref.Name, &ref.Category, &ref.Brand, &ref.ID, &ref.Specs); err != nil {
 				compRows.Close()
 				return nil, err
 			}
@@ -624,126 +629,4 @@ func (r *configRepository) FilterPoolByCompatibility(
 		result = append(result, c)
 	}
 	return result, nil
-}
-
-func (r *configRepository) GetComponentsByUseCase(usecase string) ([]domain.Component, error) {
-	rule, ok := rules.ScenarioRules[usecase]
-	if !ok {
-		return nil, fmt.Errorf("unknown usecase: %s", usecase)
-	}
-
-	var filters []string
-	var args []interface{}
-	argIdx := 1
-
-	// CPU socket + TDP
-	if len(rule.CPUSocketWhitelist) > 0 {
-		sockets := make([]string, len(rule.CPUSocketWhitelist))
-		for i, s := range rule.CPUSocketWhitelist {
-			sockets[i] = fmt.Sprintf("'%s'", s)
-		}
-		filters = append(filters, fmt.Sprintf(`(category != 'cpu' OR specs->>'socket' IN (%s))`, strings.Join(sockets, ",")))
-	}
-	if rule.MinCPUTDP > 0 {
-		filters = append(filters, fmt.Sprintf(`(category != 'cpu' OR (specs->>'tdp')::int >= $%d)`, argIdx))
-		args = append(args, rule.MinCPUTDP)
-		argIdx++
-	}
-	if rule.MaxCPUTDP > 0 {
-		filters = append(filters, fmt.Sprintf(`(category != 'cpu' OR (specs->>'tdp')::int <= $%d)`, argIdx))
-		args = append(args, rule.MaxCPUTDP)
-		argIdx++
-	}
-
-	// RAM
-	if rule.RAMType != "" {
-		filters = append(filters, fmt.Sprintf(`(category != 'ram' OR specs->>'ram_type' = $%d)`, argIdx))
-		args = append(args, rule.RAMType)
-		argIdx++
-	}
-	if rule.MinRAM > 0 {
-		filters = append(filters, fmt.Sprintf(`(category != 'ram' OR (specs->>'capacity')::int >= $%d)`, argIdx))
-		args = append(args, rule.MinRAM)
-		argIdx++
-	}
-	if rule.MaxRAM > 0 {
-		filters = append(filters, fmt.Sprintf(`(category != 'ram' OR (specs->>'capacity')::int <= $%d)`, argIdx))
-		args = append(args, rule.MaxRAM)
-		argIdx++
-	}
-
-	// GPU
-	if rule.MinGPUMemory > 0 {
-		filters = append(filters, fmt.Sprintf(`(category != 'gpu' OR (specs->>'memory_gb')::int >= $%d)`, argIdx))
-		args = append(args, rule.MinGPUMemory)
-		argIdx++
-	}
-	if rule.MaxGPUMemory > 0 {
-		filters = append(filters, fmt.Sprintf(`(category != 'gpu' OR (specs->>'memory_gb')::int <= $%d)`, argIdx))
-		args = append(args, rule.MaxGPUMemory)
-		argIdx++
-	}
-
-	// PSU
-	if rule.MinPSUPower > 0 {
-		filters = append(filters, fmt.Sprintf(`(category != 'psu' OR (specs->>'power')::int >= $%d)`, argIdx))
-		args = append(args, rule.MinPSUPower)
-		argIdx++
-	}
-	if rule.MaxPSUPower > 0 {
-		filters = append(filters, fmt.Sprintf(`(category != 'psu' OR (specs->>'power')::int <= $%d)`, argIdx))
-		args = append(args, rule.MaxPSUPower)
-		argIdx++
-	}
-
-	// SSD throughput
-	if rule.MinSSDThroughput > 0 {
-		filters = append(filters, fmt.Sprintf(`(category != 'ssd' OR (specs->>'max_throughput')::int >= $%d)`, argIdx))
-		args = append(args, rule.MinSSDThroughput)
-		argIdx++
-	}
-	// SSD form factor
-	if len(rule.SSDFormFactors) > 0 {
-		ffList := make([]string, len(rule.SSDFormFactors))
-		for i, s := range rule.SSDFormFactors {
-			ffList[i] = fmt.Sprintf("'%s'", s)
-		}
-		filters = append(filters, fmt.Sprintf(`(category != 'ssd' OR specs->>'form_factor' IN (%s))`, strings.Join(ffList, ",")))
-	}
-
-	// Case form factors
-	if len(rule.CaseFormFactors) > 0 {
-		caseList := make([]string, len(rule.CaseFormFactors))
-		for i, s := range rule.CaseFormFactors {
-			caseList[i] = fmt.Sprintf("'%s'", s)
-		}
-		filters = append(filters, fmt.Sprintf(`(category != 'case' OR specs->>'form_factor' IN (%s))`, strings.Join(caseList, ",")))
-	}
-
-	where := ""
-	if len(filters) > 0 {
-		where = "WHERE " + strings.Join(filters, " AND ")
-	}
-
-	query := fmt.Sprintf(`
-		SELECT id, name, category, brand, specs, created_at, updated_at
-		FROM components
-		%s
-	`, where)
-
-	rows, err := r.db.Query(query, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var out []domain.Component
-	for rows.Next() {
-		var c domain.Component
-		if err := rows.Scan(&c.ID, &c.Name, &c.Category, &c.Brand, &c.Specs, &c.CreatedAt, &c.UpdatedAt); err != nil {
-			return nil, err
-		}
-		out = append(out, c)
-	}
-	return out, nil
 }

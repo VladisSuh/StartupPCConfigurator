@@ -2,15 +2,16 @@ package rules
 
 // Расширяем ScenarioRule новыми полями Min/Max для CPU-TDP, RAM, GPU-памяти и PSU
 type ScenarioRule struct {
-	CPUSocketWhitelist         []string
-	MinCPUTDP, MaxCPUTDP       int
-	RAMType                    string
-	MinRAM, MaxRAM             int
-	MinGPUMemory, MaxGPUMemory int
-	MinPSUPower, MaxPSUPower   int
-	CaseFormFactors            []string
-	MinSSDThroughput           int      // минимальная пропускная способность, МБ/с
-	SSDFormFactors             []string // допустимые форм-факторы: "M.2", "2.5", и т.д.
+	CPUSocketWhitelist             []string
+	MinCPUTDP, MaxCPUTDP           int
+	RAMType                        string
+	MinRAM, MaxRAM                 int
+	MinGPUMemory, MaxGPUMemory     int
+	MinPSUPower, MaxPSUPower       int
+	MinHDDCapacity, MaxHDDCapacity int // ёмкость HDD в ГБ
+	CaseFormFactors                []string
+	MinSSDThroughput               int      // минимальная пропускная способность, МБ/с
+	SSDFormFactors                 []string // допустимые форм-факторы: "M.2", "2.5", и т.д.
 }
 
 var ScenarioRules = map[string]ScenarioRule{
@@ -24,6 +25,7 @@ var ScenarioRules = map[string]ScenarioRule{
 		CaseFormFactors:  []string{"Mini-ITX", "Micro-ATX"},
 		MinSSDThroughput: 0,
 		SSDFormFactors:   []string{"M.2", "2.5"},
+		MinHDDCapacity:   0, MaxHDDCapacity: 0,
 	},
 
 	"gaming": {
@@ -36,6 +38,7 @@ var ScenarioRules = map[string]ScenarioRule{
 		CaseFormFactors:  []string{"ATX", "Micro-ATX"},
 		MinSSDThroughput: 3000,
 		SSDFormFactors:   []string{"M.2"},
+		MinHDDCapacity:   0, MaxHDDCapacity: 0,
 	},
 
 	"htpc": {
@@ -48,6 +51,7 @@ var ScenarioRules = map[string]ScenarioRule{
 		CaseFormFactors:  []string{"Mini-ITX"},
 		MinSSDThroughput: 0,
 		SSDFormFactors:   []string{"M.2", "2.5"},
+		MinHDDCapacity:   500, MaxHDDCapacity: 8000, // фильмы и музыка
 	},
 
 	"streamer": {
@@ -60,6 +64,7 @@ var ScenarioRules = map[string]ScenarioRule{
 		CaseFormFactors:  []string{"ATX", "Micro-ATX"},
 		MinSSDThroughput: 2000,
 		SSDFormFactors:   []string{"M.2"},
+		MinHDDCapacity:   0, MaxHDDCapacity: 0,
 	},
 
 	"design": {
@@ -72,6 +77,7 @@ var ScenarioRules = map[string]ScenarioRule{
 		CaseFormFactors:  []string{"ATX"},
 		MinSSDThroughput: 2000,
 		SSDFormFactors:   []string{"M.2"},
+		MinHDDCapacity:   256, MaxHDDCapacity: 8000, // большие проекты и библиотека
 	},
 
 	"video": {
@@ -84,6 +90,7 @@ var ScenarioRules = map[string]ScenarioRule{
 		CaseFormFactors:  []string{"ATX"},
 		MinSSDThroughput: 3000,
 		SSDFormFactors:   []string{"M.2"},
+		MinHDDCapacity:   1000, MaxHDDCapacity: 16000, // видеопроекты под архив
 	},
 
 	"cad": {
@@ -96,6 +103,7 @@ var ScenarioRules = map[string]ScenarioRule{
 		CaseFormFactors:  []string{"ATX"},
 		MinSSDThroughput: 2500,
 		SSDFormFactors:   []string{"M.2"},
+		MinHDDCapacity:   0, MaxHDDCapacity: 0,
 	},
 
 	"dev": {
@@ -108,6 +116,7 @@ var ScenarioRules = map[string]ScenarioRule{
 		CaseFormFactors:  []string{"ATX", "Micro-ATX", "Mini-ITX"},
 		MinSSDThroughput: 1000,
 		SSDFormFactors:   []string{"M.2", "2.5"},
+		MinHDDCapacity:   0, MaxHDDCapacity: 8000,
 	},
 
 	"enthusiast": {
@@ -120,6 +129,7 @@ var ScenarioRules = map[string]ScenarioRule{
 		CaseFormFactors:  []string{"ATX"},
 		MinSSDThroughput: 4000,
 		SSDFormFactors:   []string{"M.2"},
+		MinHDDCapacity:   0, MaxHDDCapacity: 0,
 	},
 
 	"nas": {
@@ -132,5 +142,6 @@ var ScenarioRules = map[string]ScenarioRule{
 		CaseFormFactors:  []string{"Mini-ITX", "Micro-ATX"},
 		MinSSDThroughput: 0,
 		SSDFormFactors:   []string{"2.5", "M.2"},
+		MinHDDCapacity:   2000, MaxHDDCapacity: 16000, // первичный сценарий для HDD
 	},
 }
