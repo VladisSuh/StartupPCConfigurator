@@ -264,12 +264,14 @@ GET {{config_host}}/config/usecases
 GET {{config_host}}/config/usecase/office
 
 
+
+         
 ### 19. GET на агрегатор
 GET http://localhost:8080/offers?componentId=1&sort=priceAsc
 Authorization: Bearer {{access_token}}
 
 ### 20. Минимальная цена агрегатора
-GET http://localhost:8080/offers/min?componentId=12
+GET http://localhost:8080/offers/min?componentId=72
 
 ###################Не работает в REST-тестах
 POST http://localhost:8080/offers/import
