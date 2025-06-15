@@ -98,7 +98,139 @@ paths:
                 $ref: '#/components/schemas/User'
         '401':
           description: Не авторизован
+          
+  /auth/forgot_password:
+    post:
+      tags:
+        - Auth
+      summary: Запрос на сброс пароля (высылает ссылку по email)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForgotPasswordRequest'
+      responses:
+        '200':
+          description: Письмо с инструкциями отправлено (даже если email не найден)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "If that email is in our system, a reset link was sent."
+        '400':
+          description: Неверный формат запроса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
+  /auth/reset_password:
+    post:
+      tags:
+        - Auth
+      summary: Завершение сброса пароля по токену
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordRequest'
+      responses:
+        '200':
+          description: Пароль успешно сброшен
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Password has been reset successfully."
+        '400':
+          description: Неверный формат запроса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Невалидный или просроченный reset_token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/verify_email:
+    post:
+      tags:
+        - Auth
+      summary: Подтверждение e-mail по коду
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyEmailRequest'
+      responses:
+        '200':
+          description: Email успешно подтверждён
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Email verified successfully."
+        '400':
+          description: Неверный формат запроса или неверный verification_code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Пользователь не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/logout:
+    post:
+      tags: [ Auth ]
+      summary: Выход (удаление refresh‑token)
+      security: [ { BearerAuth: [ ] } ]
+      responses:
+        '204': { description: Успешный выход }
+        '401':
+          description: Не авторизован
+          content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+        '500':
+          description: Внутренняя ошибка
+          content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+
+  /auth/delete:
+    delete:
+      tags: [ Auth ]
+      summary: Удаление аккаунта
+      security: [ { BearerAuth: [ ] } ]
+      responses:
+        '204': { description: Аккаунт удалён }
+        '401':
+          description: Не авторизован
+          content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+        '500':
+          description: Внутренняя ошибка
+          content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
   /config/components:
     get:
       tags: [ Configurator ]
@@ -108,14 +240,21 @@ paths:
         Дополнительно можно отфильтровать по бренду (`brand`) или по сценарию
         сборки (`usecase`).  
         Если указаны оба фильтра, применяется **AND**-логика.
+        Если указан `search`, фильтры `category`, `brand`, `usecase` работают совместно c ним.
       parameters:
         - in: query
           name: category
-          required: true
           schema:
             type: string
             enum: [ cpu, gpu, motherboard, ram, hdd, ssd, cooler, case, psu ]
+          required: false
           description: Категория компонента
+        - in: query
+          name: search
+          schema:
+            type: string
+          required: false
+          description: Подстрока названия
         - in: query
           name: brand
           required: false
@@ -521,6 +660,11 @@ paths:
         '404':
           description: Подписка не найдена
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
   schemas:
     RegisterRequest:
       type: object
@@ -570,10 +714,48 @@ components:
     AuthResponse:
       type: object
       properties:
-        user:
-          $ref: '#/components/schemas/User'
-        accessToken:
+        user: { $ref: '#/components/schemas/User' }
+        accessToken: { type: string }
+        refreshToken: { type: string }
+      required: [ accessToken ]
+
+    ForgotPasswordRequest:
+      type: object
+      properties:
+        email:
           type: string
+          format: email
+          example: "{{email}}"
+      required:
+        - email
+
+    ResetPasswordRequest:
+      type: object
+      properties:
+        reset_token:
+          type: string
+          example: "{{reset_token}}"
+        new_password:
+          type: string
+          format: password
+          example: "newpassword123"
+      required:
+        - reset_token
+        - new_password
+
+    VerifyEmailRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          example: "{{email}}"
+        verification_code:
+          type: string
+          example: "Dq0fTJtg"
+      required:
+        - email
+        - verification_code
 
     User:
       type: object
@@ -715,14 +897,11 @@ components:
 
     ErrorResponse:
       type: object
+      required: [ message, code ]
       properties:
-        message:
-          type: string
-        code:
-          type: integer
-      required:
-        - message
-        - code
+        message: { type: string }
+        code: { type: integer }
+
     Notification:
       type: object
       properties:

@@ -35,6 +35,8 @@ services:
       - JWT_SECRET=${JWT_SECRET:-secret_key}
     ports:
       - "8002:8002"
+      - "6060:6060"
+
     depends_on:
       - postgres
       - rabbitmq

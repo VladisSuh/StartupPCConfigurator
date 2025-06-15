@@ -49,18 +49,18 @@ type ComponentRef struct {
 	ID       int             `json:"id"`
 	Name     string          `json:"name"`
 	Category string          `json:"category"`
-	Specs    json.RawMessage `json:"specs"`
+	Brand    string          `json:"brand,omitempty"`
+	Specs    json.RawMessage `gorm:"type:jsonb"       json:"specs"`
 }
 
 // Структура «Конфигурация» (сборка)
 type Configuration struct {
-	ID         int            `db:"id"`
-	UserID     string         `db:"user_id"`
-	Name       string         `db:"name"`
+	ID         int            `db:"id" json:"ID"`
+	UserID     uuid.UUID      `db:"user_id" json:"UserID"`
+	Name       string         `db:"name" json:"Name"`
 	Components []ComponentRef `json:"components"`
-	CreatedAt  time.Time      `db:"created_at"`
-	UpdatedAt  time.Time      `db:"updated_at"`
-	OwnerID    uuid.UUID
+	CreatedAt  time.Time      `db:"created_at" json:"CreatedAt"`
+	UpdatedAt  time.Time      `db:"updated_at" json:"UpdatedAt"`
 }
 
 var (
