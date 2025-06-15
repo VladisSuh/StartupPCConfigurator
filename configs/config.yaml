@@ -206,49 +206,31 @@ paths:
 
   /auth/logout:
     post:
-      tags:
-        - Auth
-      summary: Выход (удаление refresh_token)
-      security:
-        - bearerAuth: []
+      tags: [ Auth ]
+      summary: Выход (удаление refresh‑token)
+      security: [ { BearerAuth: [ ] } ]
       responses:
-        '204':
-          description: Успешный выход (No Content)
+        '204': { description: Успешный выход }
         '401':
           description: Не авторизован
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
         '500':
-          description: Ошибка при выходе
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+          description: Внутренняя ошибка
+          content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
 
   /auth/delete:
     delete:
-      tags:
-        - Auth
+      tags: [ Auth ]
       summary: Удаление аккаунта
-      security:
-        - bearerAuth: []
+      security: [ { BearerAuth: [ ] } ]
       responses:
-        '204':
-          description: Аккаунт успешно удалён (No Content)
+        '204': { description: Аккаунт удалён }
         '401':
           description: Не авторизован
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+          content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
         '500':
-          description: Ошибка при удалении аккаунта
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+          description: Внутренняя ошибка
+          content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
   /config/components:
     get:
       tags: [ Configurator ]
@@ -258,14 +240,21 @@ paths:
         Дополнительно можно отфильтровать по бренду (`brand`) или по сценарию
         сборки (`usecase`).  
         Если указаны оба фильтра, применяется **AND**-логика.
+        Если указан `search`, фильтры `category`, `brand`, `usecase` работают совместно c ним.
       parameters:
         - in: query
           name: category
-          required: true
           schema:
             type: string
             enum: [ cpu, gpu, motherboard, ram, hdd, ssd, cooler, case, psu ]
+          required: false
           description: Категория компонента
+        - in: query
+          name: search
+          schema:
+            type: string
+          required: false
+          description: Подстрока названия
         - in: query
           name: brand
           required: false
@@ -671,12 +660,12 @@ paths:
         '404':
           description: Подписка не найдена
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
   schemas:
-    securitySchemes:
-      bearerAuth:
-        type: http
-        scheme: bearer
-        bearerFormat: JWT
     RegisterRequest:
       type: object
       properties:
@@ -725,10 +714,10 @@ components:
     AuthResponse:
       type: object
       properties:
-        user:
-          $ref: '#/components/schemas/User'
-        accessToken:
-          type: string
+        user: { $ref: '#/components/schemas/User' }
+        accessToken: { type: string }
+        refreshToken: { type: string }
+      required: [ accessToken ]
 
     ForgotPasswordRequest:
       type: object
@@ -767,20 +756,6 @@ components:
       required:
         - email
         - verification_code
-
-    AuthResponse:
-      type: object
-      properties:
-        access_token:
-          type: string
-        refresh_token:
-          type: string
-
-    ErrorResponse:
-      type: object
-      properties:
-        error:
-          type: string
 
     User:
       type: object
@@ -922,14 +897,11 @@ components:
 
     ErrorResponse:
       type: object
+      required: [ message, code ]
       properties:
-        message:
-          type: string
-        code:
-          type: integer
-      required:
-        - message
-        - code
+        message: { type: string }
+        code: { type: integer }
+
     Notification:
       type: object
       properties:
