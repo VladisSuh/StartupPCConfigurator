@@ -30,6 +30,7 @@ type ConfigRepository interface {
 	GetComponentsByCategory(category string) ([]domain.Component, error)
 	FilterPoolByCompatibility(pool []domain.Component, filter domain.CompatibilityFilter) ([]domain.Component, error)
 	GetComponentsFiltered(ctx context.Context, f ComponentFilter) ([]domain.Component, error) // ← НОВОЕ
+	GetMinPrices(ctx context.Context, ids []int) (map[int]int, error)
 }
 
 // Реализация
@@ -719,6 +720,39 @@ func (r *configRepository) GetComponentsFiltered(
 			return nil, err
 		}
 		out = append(out, c)
+	}
+	return out, rows.Err()
+}
+
+// GetMinPrices вернёт map[component_id]int(рубли)
+func (r *configRepository) GetMinPrices(
+	ctx context.Context, ids []int,
+) (map[int]int, error) {
+
+	if len(ids) == 0 {
+		return map[int]int{}, nil
+	}
+
+	const q = `
+SELECT component_id,
+       MIN(price)::int AS min_price     -- сразу округлим
+  FROM offers
+ WHERE component_id = ANY($1)
+ GROUP BY component_id
+`
+	rows, err := r.db.QueryContext(ctx, q, pq.Array(ids))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make(map[int]int, len(ids))
+	for rows.Next() {
+		var id, price int
+		if err := rows.Scan(&id, &price); err != nil {
+			return nil, err
+		}
+		out[id] = price
 	}
 	return out, rows.Err()
 }

@@ -8,17 +8,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
-	"runtime"
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
-	"sync/atomic"
-	"time"
 
 	"github.com/google/uuid"
-	"golang.org/x/sync/errgroup"
 )
 
 var (
@@ -265,21 +259,40 @@ func (s *configService) FetchCompatibleComponentsMulti(
 	switch strings.ToLower(category) {
 	case "case":
 		specC := make(map[string]interface{})
+
+		// 1. Совместимость с материнкой:
+		//    корпус хранит max_motherboard_form_factors []string
 		if mbSpec, ok := specsByCat["motherboard"]; ok {
 			if ff, ok2 := mbSpec["form_factor"]; ok2 {
-				specC["form_factor"] = ff
+				specC["max_motherboard_form_factors"] = []interface{}{ff}
 			}
 		}
+
+		// 2. Высота кулера:
+		//    корпус.Specs["cooler_max_height"]
 		if cpuSpec, ok := specsByCat["cpu"]; ok {
 			if h, ok2 := cpuSpec["cooler_height"]; ok2 {
 				specC["cooler_max_height"] = h
 			}
 		}
+
+		// 3. Длина видеокарты:
 		if gpuSpec, ok := specsByCat["gpu"]; ok {
 			if l, ok2 := gpuSpec["length_mm"]; ok2 {
 				specC["gpu_max_length"] = l
 			}
 		}
+
+		// 4. Длина и форм-фактор блока питания:
+		if psuSpec, ok := specsByCat["psu"]; ok {
+			if l, ok2 := psuSpec["length_mm"]; ok2 {
+				specC["max_psu_length"] = l
+			}
+			if pf, ok2 := psuSpec["form_factor"]; ok2 {
+				specC["psu_form_factor"] = pf
+			}
+		}
+
 		merged = specC
 
 	case "gpu":
@@ -317,6 +330,12 @@ func (s *configService) FetchCompatibleComponentsMulti(
 		}
 		if mbSpec, ok := specsByCat["motherboard"]; ok {
 			if sock, ok2 := mbSpec["socket"]; ok2 {
+				merged["socket"] = sock
+			}
+		}
+	case "motherboard":
+		if cpuSpec, ok := specsByCat["cpu"]; ok {
+			if sock, ok2 := cpuSpec["socket"]; ok2 {
 				merged["socket"] = sock
 			}
 		}
@@ -412,31 +431,55 @@ func (s *configService) ListBrands(category string) ([]string, error) {
 }
 
 // ВЕРСИЯ ГДЕ ЗАПРОС УПАЛ ДО 8 СЕКУНД С REPO + попытка score сделать + попытка убрать parse
-func (s *configService) GetUseCaseBuild(usecaseName string, limit int) ([]domain.NamedBuild, error) {
+/*func (s *configService) GetUseCaseBuild(usecaseName string, limit int) ([]domain.NamedBuild, error) {
+	// ───────────────────────────────── rule / weight ──────────────────────────
 	rule, ok := rules.ScenarioRules[usecaseName]
 	if !ok {
 		return nil, fmt.Errorf("unknown use case %q", usecaseName)
 	}
 	w := scenarioWeights[usecaseName]
+	type cpuInfo struct {
+		comp      domain.Component
+		socket    string
+		tdp       int
+		perfScore float64
+	}
+
+	// ────────────────────────────── фиксированный CPU ─────────────────────────
+	predef := PredefinedCPUs[usecaseName] // [][]string
+	cpuRankMap := make(map[int]int)       // cpuID → ранг 0..4
+	cpus := make([]cpuInfo, 0, 5)
+
+	for rank, names := range predef {
+		for _, name := range names {
+			c, err := s.repo.GetComponentByName("cpu", name)
+			if err != nil {
+				continue // CPU отсутствует в БД
+			}
+			spec := parseSpecs(c.Specs)
+			cpus = append(cpus, cpuInfo{
+				comp:      c,
+				socket:    spec["socket"].(string),
+				tdp:       toInt(spec["tdp"]),
+				perfScore: float64(rank), // ранг как метрика «качества»
+			})
+			cpuRankMap[c.ID] = rank
+		}
+	}
+	if len(cpus) == 0 {
+		return nil, fmt.Errorf("no predefined CPUs found in DB for %q", usecaseName)
+	}
+
 	ctx := context.Background()
 	start := time.Now()
 
+	// ────────────────────────────── пул остальных категорий ───────────────────
 	var (
-		cpusRaw, mbsRaw, ramsRaw, psusRaw, casesRaw,
+		mbsRaw, ramsRaw, psusRaw, casesRaw,
 		gpusRaw, ssdsRaw, hddsRaw, coolersRaw []domain.Component
 	)
 	g, ctx := errgroup.WithContext(ctx)
 
-	g.Go(func() error {
-		var err error
-		cpusRaw, err = s.repo.GetComponentsFiltered(ctx, repository.ComponentFilter{
-			Categories:      []string{"cpu"},
-			SocketWhitelist: rule.CPUSocketWhitelist,
-			MinTDP:          rule.MinCPUTDP,
-			MaxTDP:          rule.MaxCPUTDP,
-		})
-		return err
-	})
 	g.Go(func() error {
 		var err error
 		mbsRaw, err = s.repo.GetComponentsFiltered(ctx, repository.ComponentFilter{
@@ -507,460 +550,852 @@ func (s *configService) GetUseCaseBuild(usecaseName string, limit int) ([]domain
 		})
 		return err
 	})
-
 	if err := g.Wait(); err != nil {
 		return nil, err
 	}
-	log.Printf("GetUseCaseBuild: fetch all components took %v", time.Since(start))
+	log.Printf("GetUseCaseBuild: fetch non-CPU pools took %v", time.Since(start))
 
-	// 2) Разбираем specs один раз и считаем score
-	type cpuInfo struct {
-		comp      domain.Component
-		socket    string
-		tdp       int
-		perfScore float64
-	}
-	type mbInfo struct {
-		comp       domain.Component
-		socket     string
-		formFactor string
-	}
-	type ramInfo struct {
-		comp  domain.Component
-		score float64
-	}
-	type psuInfo struct {
-		comp  domain.Component
-		score float64
-	}
-	type caseInfo struct {
-		comp            domain.Component
-		formFactor      string
-		coolerMaxHeight int
-		score           float64
-	}
-	type gpuInfo struct {
-		comp  domain.Component
-		score float64
-	}
-	type ssdInfo struct {
-		comp  domain.Component
-		score float64
-	}
-	type hddInfo struct {
-		comp  domain.Component
-		score float64
-	}
-	type coolerInfo struct {
-		comp   domain.Component
-		socket string
-		height int
-		score  float64
-	}
-
+	// ────────────────────── парс specs остальных пулов (параллельно) ──────────
+	type (
+		mbInfo struct {
+			comp               domain.Component
+			socket, formFactor string
+		}
+		ramInfo struct {
+			comp  domain.Component
+			score float64
+		}
+		psuInfo struct {
+			comp  domain.Component
+			score float64
+		}
+		caseInfo struct {
+			comp       domain.Component
+			formFactor string
+			coolerMax  int
+		}
+		gpuInfo struct {
+			comp  domain.Component
+			score float64
+		}
+		ssdInfo struct {
+			comp  domain.Component
+			score float64
+		}
+		hddInfo struct {
+			comp  domain.Component
+			score float64
+		}
+		coolerInfo struct {
+			comp   domain.Component
+			socket string
+			height int
+		}
+	)
 	var (
-		cpus    = make([]cpuInfo, 0, len(cpusRaw))
-		mbs     = make([]mbInfo, 0, len(mbsRaw))
-		rams    = make([]ramInfo, 0, len(ramsRaw))
-		gpus    = make([]gpuInfo, 0, len(gpusRaw))
-		psus    = make([]psuInfo, 0, len(psusRaw))
-		cases   = make([]caseInfo, 0, len(casesRaw))
-		ssds    = make([]ssdInfo, 0, len(ssdsRaw))
-		hdds    = make([]hddInfo, 0, len(hddsRaw))
-		coolers = make([]coolerInfo, 0, len(coolersRaw))
+		mbs     []mbInfo
+		rams    []ramInfo
+		psus    []psuInfo
+		cases   []caseInfo
+		gpus    []gpuInfo
+		ssds    []ssdInfo
+		hdds    []hddInfo
+		coolers []coolerInfo
 	)
 
 	var wg sync.WaitGroup
-	wg.Add(8)
+	wg.Add(7)
 
-	// 1) CPU
-	go func() {
-		defer wg.Done()
-		for _, c := range cpusRaw {
-			spec := parseSpecs(c.Specs)
-			perf := toInt(spec["cores"])*2 + toInt(spec["threads"])
-			score := normalize(perf, 8, 48) * w.CPU
-			cpus = append(cpus, cpuInfo{comp: c, socket: spec["socket"].(string),
-				tdp: toInt(spec["tdp"]), perfScore: score})
-		}
-	}()
-
-	// 2) MB
-	go func() {
+	go func() { // MB
 		defer wg.Done()
 		for _, m := range mbsRaw {
-			spec := parseSpecs(m.Specs)
-			mbs = append(mbs, mbInfo{comp: m, socket: spec["socket"].(string),
-				formFactor: spec["form_factor"].(string)})
+			s := parseSpecs(m.Specs)
+			mbs = append(mbs, mbInfo{comp: m, socket: s["socket"].(string), formFactor: s["form_factor"].(string)})
 		}
 	}()
-	// 3) RAM
-	go func() {
+	go func() { // RAM
 		defer wg.Done()
 		for _, r := range ramsRaw {
-			spec := parseSpecs(r.Specs)
-			cap := toInt(spec["capacity"])
-			score := normalize(cap, rule.MinRAM, rule.MaxRAM) * w.RAM
+			s := parseSpecs(r.Specs)
+			c := toInt(s["capacity"])
+			score := normalize(c, rule.MinRAM, rule.MaxRAM) * w.RAM
 			rams = append(rams, ramInfo{comp: r, score: score})
 		}
 	}()
-	// 5) PSU
-	go func() {
+	go func() { // PSU
 		defer wg.Done()
 		for _, p := range psusRaw {
-			spec := parseSpecs(p.Specs)
-			power := toInt(spec["power"])
-			score := normalize(power, rule.MinPSUPower, rule.MaxPSUPower) * w.PSU
+			s := parseSpecs(p.Specs)
+			pow := toInt(s["power"])
+			score := normalize(pow, rule.MinPSUPower, rule.MaxPSUPower) * w.PSU
 			psus = append(psus, psuInfo{comp: p, score: score})
 		}
 	}()
-	// 6) Case
-	go func() {
+	go func() { // Case
 		defer wg.Done()
 		for _, c := range casesRaw {
-			spec := parseSpecs(c.Specs)
-			bays := toInt(spec["drive_bays_2_5"]) + toInt(spec["drive_bays_3_5"])
-			score := float64(bays) * w.SSD
-			cases = append(cases, caseInfo{comp: c, formFactor: spec["form_factor"].(string),
-				coolerMaxHeight: toInt(spec["cooler_max_height"]), score: score})
+			s := parseSpecs(c.Specs)
+			cases = append(cases, caseInfo{
+				comp:       c,
+				formFactor: s["form_factor"].(string),
+				coolerMax:  toInt(s["cooler_max_height"]),
+			})
 		}
 	}()
-
-	// 4) GPU
-	go func() {
+	go func() { // GPU
 		defer wg.Done()
 		for _, g := range gpusRaw {
-			spec := parseSpecs(g.Specs)
-			mem := toInt(spec["memory_gb"])
+			s := parseSpecs(g.Specs)
+			mem := toInt(s["memory_gb"])
 			score := normalize(mem, rule.MinGPUMemory, rule.MaxGPUMemory) * w.GPU
 			gpus = append(gpus, gpuInfo{comp: g, score: score})
 		}
 	}()
-
-	// 7) SSD & HDD
-	go func() {
+	go func() { // SSD
 		defer wg.Done()
-		for _, s := range ssdsRaw {
-			spec := parseSpecs(s.Specs)
-			tp := toInt(spec["max_throughput"])
+		for _, ssd := range ssdsRaw {
+			s := parseSpecs(ssd.Specs)
+			tp := toInt(s["max_throughput"])
 			score := normalize(tp, rule.MinSSDThroughput, 8000) * w.SSD
-			ssds = append(ssds, ssdInfo{comp: s, score: score})
+			ssds = append(ssds, ssdInfo{comp: ssd, score: score})
 		}
+	}()
+	go func() { // HDD + Cooler
+		defer wg.Done()
 		for _, h := range hddsRaw {
-			spec := parseSpecs(h.Specs)
-			cap := toInt(spec["capacity_gb"])
-			score := normalize(cap, rule.MinHDDCapacity, rule.MaxHDDCapacity) * w.HDD
+			s := parseSpecs(h.Specs)
+			c := toInt(s["capacity_gb"])
+			score := normalize(c, rule.MinHDDCapacity, rule.MaxHDDCapacity) * w.HDD
 			hdds = append(hdds, hddInfo{comp: h, score: score})
 		}
-	}()
-	// 8) Cooler
-	go func() {
-		defer wg.Done()
-		for _, c := range coolersRaw {
-			spec := parseSpecs(c.Specs)
-			h := toInt(spec["height_mm"])
-			score := normalize(200-h, 0, 200) * w.PSU
-			coolers = append(coolers, coolerInfo{comp: c, socket: spec["socket"].(string),
-				height: h, score: score})
+		for _, cl := range coolersRaw {
+			s := parseSpecs(cl.Specs)
+			coolers = append(coolers, coolerInfo{
+				comp:   cl,
+				socket: s["socket"].(string),
+				height: toInt(s["height_mm"]),
+			})
 		}
 	}()
-
 	wg.Wait()
 
-	duration := time.Since(start)
-	log.Printf("GetUseCaseBuild: name=%s took %s", usecaseName, duration)
-
-	// 3) Собираем быстрые мапы совместимости и пуллы
-	mbsBySocket := make(map[string][]mbInfo)
+	// ────────────────────── быстрые мапы совместимости ───────────────────────
+	mbBySocket := map[string][]mbInfo{}
 	for _, mb := range mbs {
-		mbsBySocket[mb.socket] = append(mbsBySocket[mb.socket], mb)
+		mbBySocket[mb.socket] = append(mbBySocket[mb.socket], mb)
 	}
-	casesByForm := make(map[string][]caseInfo)
-	for _, cs := range cases {
-		casesByForm[cs.formFactor] = append(casesByForm[cs.formFactor], cs)
-	}
-	coolerBySocket := make(map[string][]coolerInfo)
+	coolerBySocket := map[string][]coolerInfo{}
 	for _, cl := range coolers {
 		coolerBySocket[cl.socket] = append(coolerBySocket[cl.socket], cl)
 	}
+	caseByForm := map[string][]caseInfo{}
+	for _, cs := range cases {
+		caseByForm[cs.formFactor] = append(caseByForm[cs.formFactor], cs)
+	}
 
-	// ────────────────────────────────────────────────────────────────
-	// 4) Строим мапы скор- и TDP-значений один раз для rankCached
-	// ────────────────────────────────────────────────────────────────
-	cpuScoreMap := make(map[int]float64, len(cpus))
-	cpuTDPMap := make(map[int]int, len(cpus))
+	// ────────────────────────── генерация «жёстких» combo ---------------------
+	type hardCombo struct{ cpu, mb, ram, psu domain.Component }
+	var hardList []hardCombo
 	for _, ci := range cpus {
-		cpuScoreMap[ci.comp.ID] = ci.perfScore
-		cpuTDPMap[ci.comp.ID] = ci.tdp
+		for _, mb := range mbBySocket[ci.socket] {
+			for _, r := range rams {
+				for _, p := range psus {
+					hardList = append(hardList, hardCombo{
+						cpu: ci.comp, mb: mb.comp, ram: r.comp, psu: p.comp,
+					})
+				}
+			}
+		}
 	}
 
-	gpuScoreMap := make(map[int]float64, len(gpus))
-	gpuTDPMap := make(map[int]int, len(gpus))
-	for _, gi := range gpus {
-		gpuScoreMap[gi.comp.ID] = gi.score
-		// если тебе нужен именно power_draw — получай его из gi.comp.Specs
-		gpuTDPMap[gi.comp.ID] = toInt(parseSpecs(gi.comp.Specs)["power_draw"])
+	// ─────────────────────── case+cooler, затем SSD/HDD/GPU ───────────────────
+	type midCombo struct {
+		h   hardCombo
+		cs  domain.Component
+		clr domain.Component
+	}
+	var midList []midCombo
+	for _, hc := range hardList {
+		socket := parseSpecs(hc.cpu.Specs)["socket"].(string)
+		form := parseSpecs(hc.mb.Specs)["form_factor"].(string)
+		for _, cs := range caseByForm[form] {
+			for _, cl := range coolerBySocket[socket] {
+				if cl.height > cs.coolerMax {
+					continue
+				}
+				midList = append(midList, midCombo{h: hc, cs: cs.comp, clr: cl.comp})
+			}
+		}
 	}
 
-	ramScoreMap := make(map[int]float64, len(rams))
-	for _, ri := range rams {
-		ramScoreMap[ri.comp.ID] = ri.score
-	}
-
-	ssdScoreMap := make(map[int]float64, len(ssds))
-	for _, si := range ssds {
-		ssdScoreMap[si.comp.ID] = si.score
-	}
-
-	hddScoreMap := make(map[int]float64, len(hdds))
-	for _, hi := range hdds {
-		hddScoreMap[hi.comp.ID] = hi.score
-	}
-
-	psuScoreMap := make(map[int]float64, len(psus))
-	for _, pi := range psus {
-		psuScoreMap[pi.comp.ID] = pi.score
-	}
-	// ────────────────────────────────────────────────────────────────
-
-	// Пулы GPU/SSD/HDD (с опциональным «пустым» элементом)
+	// пулы с «пустыми» элементами
 	var gpuPool []domain.Component
-	for _, gi := range gpus {
-		gpuPool = append(gpuPool, gi.comp)
+	for _, g := range gpus {
+		gpuPool = append(gpuPool, g.comp)
 	}
 	if rule.MinGPUMemory == 0 {
 		gpuPool = append([]domain.Component{{}}, gpuPool...)
 	}
-	var ssdPool []domain.Component
-	for _, si := range ssds {
-		ssdPool = append(ssdPool, si.comp)
-	}
+
 	var hddPool []domain.Component
-	for _, hi := range hdds {
-		hddPool = append(hddPool, hi.comp)
+	for _, h := range hdds {
+		hddPool = append(hddPool, h.comp)
 	}
 	if rule.MinHDDCapacity == 0 {
 		hddPool = append([]domain.Component{{}}, hddPool...)
 	}
 
-	type hardCombo struct {
-		cpu domain.Component
-		mb  domain.Component
-		ram domain.Component
-		psu domain.Component
+	var ssdPool []domain.Component
+	for _, s2 := range ssds {
+		ssdPool = append(ssdPool, s2.comp)
 	}
-	const (
-		maxCPU  = 12
-		maxMB   = 12
-		maxRAM  = 12
-		maxPSU  = 8
-		maxCase = 8
-	)
 
-	numCPU := runtime.NumCPU()
-	jobs := make(chan hardCombo, 1024) // буферный канал для производительности
-	hardList := make([]hardCombo, 0, maxCPU*maxMB*maxRAM*maxPSU)
-
-	go func() {
-		for _, ci := range cpus {
-			for _, mb := range mbsBySocket[ci.socket] {
-				for _, ri := range rams {
-					for _, pi := range psus {
-						jobs <- hardCombo{
-							cpu: ci.comp,
-							mb:  mb.comp,
-							ram: ri.comp,
-							psu: pi.comp,
-						}
+	// полный перебор до limit
+	var combos [][]domain.Component
+outer:
+	for _, mc := range midList {
+		base := []domain.Component{mc.h.cpu, mc.h.mb, mc.h.ram, mc.h.psu, mc.cs, mc.clr}
+		for _, ssd := range ssdPool {
+			for _, hdd := range hddPool {
+				for _, gpu := range gpuPool {
+					c := append(append([]domain.Component{}, base...), ssd)
+					if hdd.ID != 0 {
+						c = append(c, hdd)
 					}
-				}
-			}
-		}
-		close(jobs)
-	}()
-
-	var hlMu sync.Mutex
-	wg.Add(numCPU)
-
-	for i := 0; i < numCPU; i++ {
-		go func() {
-			defer wg.Done()
-			for hc := range jobs {
-				hlMu.Lock()
-				hardList = append(hardList, hc)
-				hlMu.Unlock()
-			}
-		}()
-	}
-
-	wg.Wait()
-
-	type midCombo struct {
-		hard   hardCombo
-		cs     domain.Component
-		cooler domain.Component
-	}
-	// 2) Для каждого «жёсткого» приклеиваем допустимые Case + Cooler
-	midList := make([]midCombo, 0, len(hardList)*4) // емпирически
-	for _, hc := range hardList {
-		socket := parseSpecs(hc.cpu.Specs)["socket"].(string)
-		for _, cs := range casesByForm[parseSpecs(hc.mb.Specs)["form_factor"].(string)] {
-			for _, cl := range coolerBySocket[socket] {
-				if cl.height > cs.coolerMaxHeight {
-					continue
-				}
-				midList = append(midList, midCombo{
-					hard:   hc,
-					cs:     cs.comp,
-					cooler: cl.comp,
-				})
-			}
-		}
-	}
-
-	duration2 := time.Since(start)
-	log.Printf("GetUseCaseBuild: name=%s took %s", usecaseName, duration2)
-
-	// 3) Параллельный ранкинг
-	type comboResult struct {
-		rank  int
-		combo []domain.Component
-	}
-
-	numWorkers := runtime.NumCPU()
-	midLen := len(midList)
-	chunkSize := (midLen + numWorkers - 1) / numWorkers
-
-	results := make(chan comboResult, limit)
-	// защищённые общие структуры
-	var (
-		mu     sync.Mutex
-		seen   = make(map[string]struct{})
-		ranked = make(map[int][]domain.Component)
-		need   = int32(limit)
-	)
-
-	worker := func(start, end int) {
-		defer wg.Done()
-		for i := start; i < end && atomic.LoadInt32(&need) > 0; i++ {
-			mc := midList[i]
-			base := []domain.Component{
-				mc.hard.cpu, mc.hard.mb, mc.hard.ram,
-				mc.hard.psu, mc.cs, mc.cooler,
-			}
-
-			for _, ss := range ssdPool {
-				if atomic.LoadInt32(&need) <= 0 {
-					return
-				}
-				for _, hd := range hddPool {
-					if atomic.LoadInt32(&need) <= 0 {
-						return
+					if gpu.ID != 0 {
+						c = append(c, gpu)
 					}
-					for _, gp := range gpuPool {
-						if atomic.LoadInt32(&need) <= 0 {
-							return
-						}
-
-						combo := make([]domain.Component, len(base), len(base)+2)
-						copy(combo, base)
-						combo = append(combo, ss)
-						if hd.ID != 0 {
-							combo = append(combo, hd)
-						}
-						if gp.ID != 0 {
-							combo = append(combo, gp)
-						}
-
-						key := hashCombo(combo)
-						mu.Lock()
-						if _, dup := seen[key]; dup {
-							mu.Unlock()
-							continue
-						}
-						seen[key] = struct{}{}
-						mu.Unlock()
-
-						rank := rankCached(usecaseName, combo,
-							cpuScoreMap, gpuScoreMap, ramScoreMap,
-							ssdScoreMap, hddScoreMap, psuScoreMap,
-							cpuTDPMap, gpuTDPMap,
-						)
-						if rank >= len(buildLabels) {
-							rank = len(buildLabels) - 1
-						}
-
-						mu.Lock()
-						if _, exists := ranked[rank]; !exists && atomic.LoadInt32(&need) > 0 {
-							ranked[rank] = combo
-							atomic.AddInt32(&need, -1)
-							results <- comboResult{rank: rank, combo: combo}
-						}
-						mu.Unlock()
+					if !ValidateCombo(c, rule) {
+						continue
+					}
+					combos = append(combos, c)
+					if len(combos) >= limit {
+						break outer
 					}
 				}
 			}
 		}
 	}
-
-	for w := 0; w < numWorkers; w++ {
-		start := w * chunkSize
-		end := (w + 1) * chunkSize
-		if end > midLen {
-			end = midLen
-		}
-		if start < end {
-			wg.Add(1)
-			go worker(start, end)
-		}
+	if len(combos) == 0 {
+		return nil, fmt.Errorf("no valid builds produced")
 	}
 
-	// закрываем канал, когда все воркеры отработают
-	go func() {
-		wg.Wait()
-		close(results)
-	}()
+	// ─────────────────────── группировка по рангу CPU ─────────────────────────
+	rankBuckets := make(map[int][][]domain.Component) // корректная инициализация
+	for _, c := range combos {
+		cpu := findCPU(c)
+		if cpu == nil {
+			continue
+		}
+		rank, ok := cpuRankMap[cpu.ID] // ищём ранг в мапе
+		if !ok {
+			// CPU нет в PredefinedCPUs → пропускаем
+			continue
+		}
+		rankBuckets[rank] = append(rankBuckets[rank], c)
+	}
 
-	// собираем первые limit сборок
-	var out []domain.NamedBuild
-	for res := range results {
+	// ────────────────── выбираем лучшую сборку в каждом ранге ────────────────
+	out := make([]domain.NamedBuild, 0, 5)
+	for rank := 0; rank < 5; rank++ {
+		bucket := rankBuckets[rank]
+		if len(bucket) == 0 {
+			continue
+		}
+		best := bucket[0]
+		bestScore := rankCached(usecaseName, best, nil, nil, nil, nil, nil, nil, nil, nil)
+		for _, c := range bucket[1:] {
+			sc := rankCached(usecaseName, c, nil, nil, nil, nil, nil, nil, nil, nil)
+			if sc > bestScore {
+				best, bestScore = c, sc
+			}
+		}
 		out = append(out, domain.NamedBuild{
-			Name:       buildLabels[res.rank],
-			Components: res.combo,
+			Name:       buildLabels[rank],
+			Components: best,
 		})
 		if len(out) >= limit {
 			break
 		}
 	}
+	return out, nil
+}*/
 
-	if len(out) < limit {
-		return nil, fmt.Errorf("не получилось набрать %d сборок, нашлось только %d", limit, len(out))
+// NamedComponent представляет компонент с его категорией
+type NamedComponent struct {
+	Name     string
+	Category string
+}
+
+// PredefinedBuilds содержит предопределённые сборки по сценариям использования
+var PredefinedBuilds = map[string][][]NamedComponent{
+	"office": {
+		{
+			{Name: "AMD Athlon 3000G", Category: "cpu"},
+			{Name: "ASUS PRIME A320M-K", Category: "motherboard"},
+			{Name: "Kingston ValueRAM 8GB DDR4-2666", Category: "ram"},
+			{Name: "ADATA SU650 240GB", Category: "ssd"},
+			{Name: "Seasonic SSP-300ET", Category: "psu"},
+			{Name: "DeepCool Matrexx 30", Category: "case"},
+		},
+		{
+			{Name: "Intel Pentium Gold G7400T", Category: "cpu"},
+			{Name: "Gigabyte H610M K", Category: "motherboard"},
+			{Name: "Kingston ValueRAM 8GB DDR4-2666", Category: "ram"},
+			{Name: "Kingston A400 480GB", Category: "ssd"},
+			{Name: "Seasonic SSP-300ET", Category: "psu"},
+			{Name: "DeepCool Matrexx 30", Category: "case"},
+		},
+		{
+			{Name: "Intel Core i3-12100T", Category: "cpu"},
+			{Name: "Gigabyte H610M K", Category: "motherboard"},
+			{Name: "Corsair Vengeance LPX 16GB DDR4-3200", Category: "ram"}, // если нет — можно 2x8GB 2666
+			{Name: "Kingston A400 480GB", Category: "ssd"},
+			{Name: "Seasonic SSP-300ET", Category: "psu"},
+			{Name: "DeepCool Matrexx 30", Category: "case"},
+		},
+		{
+			{Name: "AMD Ryzen 5 5600GE", Category: "cpu"},
+			{Name: "ASUS PRIME A320M-K", Category: "motherboard"},
+			{Name: "Corsair Vengeance LPX 16GB DDR4-3200", Category: "ram"},
+			{Name: "Kingston A400 480GB", Category: "ssd"},
+			{Name: "Seasonic SSP-300ET", Category: "psu"},
+			{Name: "DeepCool Matrexx 30", Category: "case"},
+		},
+		{
+			{Name: "AMD Ryzen 5 5600X", Category: "cpu"},
+			{Name: "MSI B550 Tomahawk", Category: "motherboard"},
+			{Name: "Corsair Vengeance LPX 16GB DDR4-3200", Category: "ram"},
+			{Name: "Kingston A400 480GB", Category: "ssd"},
+			{Name: "Seasonic SSP-300ET", Category: "psu"},
+			{Name: "DeepCool Matrexx 30", Category: "case"},
+		},
+	},
+
+	"gaming": {
+		{
+			{Name: "Intel Core i5-13400", Category: "cpu"},
+			{Name: "Gigabyte Z790 AORUS Elite AX", Category: "motherboard"},
+			{Name: "Corsair Vengeance 32GB DDR5-6000", Category: "ram"},
+			{Name: "AMD Radeon RX 6700 XT", Category: "gpu"},
+			{Name: "Crucial P3 1TB", Category: "ssd"},
+			{Name: "Corsair RM750", Category: "psu"},
+			{Name: "Fractal Design North", Category: "case"},
+		},
+		{
+			{Name: "Intel Core i5-14400", Category: "cpu"},
+			{Name: "Gigabyte Z790 AORUS Elite AX", Category: "motherboard"},
+			{Name: "Corsair Vengeance 32GB DDR5-6000", Category: "ram"},
+			{Name: "AMD Radeon RX 7800 XT", Category: "gpu"},
+			{Name: "WD Black SN850X 1TB", Category: "ssd"},
+			{Name: "ARCTIC Freezer 34 eSports DUO", Category: "cooler"},
+			{Name: "Corsair RM850x SHIFT", Category: "psu"},
+			{Name: "Phanteks Eclipse G500A", Category: "case"},
+		},
+		{
+			{Name: "AMD Ryzen 5 7600", Category: "cpu"},
+			{Name: "ASUS TUF Gaming B650-PLUS WIFI", Category: "motherboard"},
+			{Name: "Corsair Vengeance 32GB DDR5-6000", Category: "ram"},
+			{Name: "NVIDIA GeForce RTX 4060 8GB", Category: "gpu"},
+			{Name: "WD Blue SN570 1TB", Category: "ssd"},
+			{Name: "Seasonic Focus GX-650", Category: "psu"},
+			{Name: "Phanteks Eclipse P400A", Category: "case"},
+		},
+		{
+			{Name: "AMD Ryzen 7 7700X", Category: "cpu"},
+			{Name: "ASUS ROG Strix X670E-E Gaming WiFi", Category: "motherboard"},
+			{Name: "G.Skill Trident Z5 RGB 32GB DDR5-6000", Category: "ram"},
+			{Name: "NVIDIA GeForce RTX 4070 Ti SUPER 16GB", Category: "gpu"},
+			{Name: "Samsung 990 Pro 4TB", Category: "ssd"},
+			{Name: "Seagate IronWolf 4TB", Category: "hdd"},
+			{Name: "Thermalright Peerless Assassin 120 SE", Category: "cooler"},
+			{Name: "Corsair HX1000i 1000W", Category: "psu"},
+			{Name: "Lian Li O11D EVO", Category: "case"},
+		},
+		{
+			{Name: "Intel Core i7-14700K", Category: "cpu"},
+			{Name: "Gigabyte Z790 AORUS Master", Category: "motherboard"},
+			{Name: "G.Skill Trident Z5 128GB DDR5-6000", Category: "ram"},
+			{Name: "NVIDIA GeForce RTX 4080 SUPER 16GB", Category: "gpu"},
+			{Name: "Crucial T700 2TB", Category: "ssd"},
+			{Name: "Toshiba N300 6TB", Category: "hdd"},
+			{Name: "Noctua NH-U12A chromax.black", Category: "cooler"},
+			{Name: "Corsair HX1000i 1000W", Category: "psu"},
+			{Name: "Lian Li O11D EVO", Category: "case"},
+		},
+	},
+	"htpc": {
+		{
+			{Name: "AMD Athlon 3000G", Category: "cpu"},
+			{Name: "ASRock B550 Phantom Gaming-ITX/ax", Category: "motherboard"},
+			{Name: "Kingston ValueRAM 8GB DDR4-2666", Category: "ram"},
+			{Name: "ADATA SU650 240GB", Category: "ssd"},
+			{Name: "Seagate Barracuda 2TB", Category: "hdd"},
+			{Name: "SilverStone ST30SF V2.0", Category: "psu"},
+			{Name: "SilverStone SG13", Category: "case"},
+		},
+		{
+			{Name: "Intel Pentium Gold G7400T", Category: "cpu"},
+			{Name: "ASUS ROG Strix B660-I Gaming WiFi", Category: "motherboard"},
+			{Name: "Kingston ValueRAM 8GB DDR4-2666", Category: "ram"},
+			{Name: "Kingston A400 480GB", Category: "ssd"},
+			{Name: "Seagate Barracuda 2TB", Category: "hdd"},
+			{Name: "SilverStone SX450-G", Category: "psu"}, // чуть выше 350 Вт, но компактный и тихий
+			{Name: "SilverStone SG13", Category: "case"},
+		},
+		{
+			{Name: "Intel Core i3-12100T", Category: "cpu"},
+			{Name: "ASUS ROG Strix B660-I Gaming WiFi", Category: "motherboard"},
+			{Name: "Corsair Vengeance LPX 16GB DDR4-3200", Category: "ram"},
+			{Name: "Kingston NV2 500GB", Category: "ssd"},
+			{Name: "WD Red Plus 4TB", Category: "hdd"},
+			{Name: "Corsair SF500", Category: "psu"}, // чуть выше лимита, но тихий и SFX
+			{Name: "Fractal Design Node 202", Category: "case"},
+		},
+		{
+			{Name: "AMD Ryzen 5 5600GE", Category: "cpu"},
+			{Name: "ASRock B550 Phantom Gaming-ITX/ax", Category: "motherboard"},
+			{Name: "Corsair Vengeance LPX 16GB DDR4-3200", Category: "ram"},
+			{Name: "Kingston A2000 500GB", Category: "ssd"},
+			{Name: "Toshiba N300 6TB", Category: "hdd"},
+			{Name: "SilverStone SX500-G", Category: "psu"},
+			{Name: "Fractal Design Node 202", Category: "case"},
+		},
+		{
+			{Name: "Intel Core i7-13700T", Category: "cpu"},
+			{Name: "ASUS ROG Strix B660-I Gaming WiFi", Category: "motherboard"},
+			{Name: "Corsair Vengeance LPX 16GB DDR4-3200", Category: "ram"},
+			{Name: "Samsung 980 Pro 1TB", Category: "ssd"},
+			{Name: "Toshiba N300 6TB", Category: "hdd"},
+			{Name: "Corsair SF500", Category: "psu"},
+			{Name: "Fractal Design Node 202", Category: "case"},
+		},
+	},
+	"streamer": {
+		{
+			{Name: "AMD Ryzen 7 7700X", Category: "cpu"},
+			{Name: "ASUS TUF Gaming B650-PLUS WIFI", Category: "motherboard"},
+			{Name: "Corsair Vengeance 32GB DDR5-6000", Category: "ram"},
+			{Name: "AMD Radeon RX 6700 10GB", Category: "gpu"},
+			{Name: "WD Black SN770 1TB", Category: "ssd"},
+			{Name: "Seagate Barracuda 2TB", Category: "hdd"},
+			{Name: "ARCTIC Freezer 34 eSports DUO", Category: "cooler"},
+			{Name: "Corsair RM750e", Category: "psu"},
+			{Name: "Phanteks Eclipse P400A", Category: "case"},
+		},
+		{
+			{Name: "Intel Core i5-14400", Category: "cpu"},
+			{Name: "Gigabyte Z790 AORUS Elite AX", Category: "motherboard"},
+			{Name: "Corsair Vengeance 32GB DDR5-6000", Category: "ram"},
+			{Name: "NVIDIA GeForce RTX 3080 10GB", Category: "gpu"},
+			{Name: "Crucial P3 1TB", Category: "ssd"},
+			{Name: "WD Red Plus 4TB", Category: "hdd"},
+			{Name: "ARCTIC Freezer 34 eSports DUO", Category: "cooler"},
+			{Name: "Corsair RM850x SHIFT", Category: "psu"},
+			{Name: "Fractal Design North", Category: "case"},
+		},
+		{
+			{Name: "Intel Core i7-13700", Category: "cpu"},
+			{Name: "Gigabyte Z790 AORUS Master", Category: "motherboard"},
+			{Name: "Kingston Fury Renegade 64GB DDR5-6400", Category: "ram"},
+			{Name: "AMD Radeon RX 7800 XT", Category: "gpu"},
+			{Name: "Samsung 980 Pro 1TB", Category: "ssd"},
+			{Name: "Toshiba N300 6TB", Category: "hdd"},
+			{Name: "Noctua NH-U12A chromax.black", Category: "cooler"},
+			{Name: "Corsair HX1000i 1000W", Category: "psu"},
+			{Name: "Phanteks Eclipse G500A", Category: "case"},
+		},
+		{
+			{Name: "AMD Ryzen 7 7800X3D", Category: "cpu"},
+			{Name: "ASUS ROG Strix X670E-E Gaming WiFi", Category: "motherboard"},
+			{Name: "Kingston Fury Renegade 64GB DDR5-6400", Category: "ram"},
+			{Name: "NVIDIA GeForce RTX 4070 SUPER", Category: "gpu"},
+			{Name: "Samsung 990 Pro 4TB", Category: "ssd"},
+			{Name: "Toshiba N300 6TB", Category: "hdd"},
+			{Name: "Thermalright Peerless Assassin 120 SE", Category: "cooler"},
+			{Name: "Seasonic PRIME TX-1000", Category: "psu"},
+			{Name: "Lian Li O11D EVO", Category: "case"},
+		},
+		{
+			{Name: "Intel Core i9-14900K", Category: "cpu"},
+			{Name: "Gigabyte Z790 AORUS Master", Category: "motherboard"},
+			{Name: "G.Skill Trident Z5 128GB DDR5-6000", Category: "ram"},
+			{Name: "NVIDIA GeForce RTX 4080 SUPER 16GB", Category: "gpu"},
+			{Name: "Crucial T700 2TB", Category: "ssd"},
+			{Name: "Toshiba N300 6TB", Category: "hdd"},
+			{Name: "Noctua NH-D15", Category: "cooler"},
+			{Name: "Corsair HX1000i 1000W", Category: "psu"},
+			{Name: "Lian Li O11D EVO", Category: "case"},
+		},
+	},
+	"design": {
+		{
+			{Name: "AMD Ryzen 5 7600", Category: "cpu"},
+			{Name: "ASUS TUF Gaming B650-PLUS WIFI", Category: "motherboard"},
+			{Name: "Corsair Vengeance 32GB DDR5-6000", Category: "ram"},
+			{Name: "AMD Radeon RX 6700 10GB", Category: "gpu"},
+			{Name: "Kingston A2000 500GB", Category: "ssd"},
+			{Name: "Seagate Barracuda 2TB", Category: "hdd"},
+			{Name: "Thermalright Peerless Assassin 120 SE", Category: "cooler"},
+			{Name: "Seasonic Focus GX-650", Category: "psu"},
+			{Name: "Phanteks Eclipse P400A", Category: "case"},
+		},
+		{
+			{Name: "AMD Ryzen 7 7700X", Category: "cpu"},
+			{Name: "ASUS ROG Strix X670E-E Gaming WiFi", Category: "motherboard"},
+			{Name: "Corsair Vengeance RGB Pro 64GB DDR4-3600", Category: "ram"}, // если не хочешь DDR4 — замени
+			{Name: "AMD Radeon RX 7800 XT", Category: "gpu"},
+			{Name: "WD Black SN850X 1TB", Category: "ssd"},
+			{Name: "WD Red Plus 4TB", Category: "hdd"},
+			{Name: "Scythe Fuma 2 Rev.B", Category: "cooler"},
+			{Name: "Corsair RM850x SHIFT", Category: "psu"},
+			{Name: "Phanteks Eclipse G500A", Category: "case"},
+		},
+		{
+			{Name: "AMD Ryzen 7 7800X3D", Category: "cpu"},
+			{Name: "ASUS ROG Strix X670E-E Gaming WiFi", Category: "motherboard"},
+			{Name: "Kingston Fury Renegade 64GB DDR5-6400", Category: "ram"},
+			{Name: "NVIDIA GeForce RTX 4070 SUPER", Category: "gpu"},
+			{Name: "Samsung 990 Pro 4TB", Category: "ssd"},
+			{Name: "Seagate IronWolf 4TB", Category: "hdd"},
+			{Name: "DeepCool AK620 Digital", Category: "cooler"},
+			{Name: "Corsair HX1000i 1000W", Category: "psu"},
+			{Name: "Fractal Design North", Category: "case"},
+		},
+		{
+			{Name: "AMD Ryzen 9 7950X", Category: "cpu"},
+			{Name: "ASUS ROG Strix X670E-E Gaming WiFi", Category: "motherboard"},
+			{Name: "G.Skill Trident Z5 RGB 32GB DDR5-6000", Category: "ram"},
+			{Name: "NVIDIA GeForce RTX 4080 SUPER 16GB", Category: "gpu"},
+			{Name: "Crucial T700 2TB", Category: "ssd"},
+			{Name: "Seagate IronWolf 4TB", Category: "hdd"},
+
+			{Name: "Noctua NH-U12A chromax.black", Category: "cooler"},
+			{Name: "Corsair HX1000i 1000W", Category: "psu"},
+			{Name: "Lian Li O11D EVO", Category: "case"},
+		},
+		{
+			{Name: "AMD Ryzen 9 7950X3D", Category: "cpu"},
+			{Name: "ASUS ROG Strix X670E-E Gaming WiFi", Category: "motherboard"},
+			{Name: "G.Skill Trident Z5 128GB DDR5-6000", Category: "ram"},
+			{Name: "AMD Radeon RX 7900 XTX 24GB", Category: "gpu"},
+			{Name: "Samsung 990 Pro 4TB", Category: "ssd"},
+			{Name: "Seagate IronWolf 4TB", Category: "hdd"},
+			{Name: "Noctua NH-D15", Category: "cooler"},
+			{Name: "Corsair HX1500i", Category: "psu"},
+			{Name: "Lian Li O11D EVO", Category: "case"},
+		},
+	},
+	"video": {
+		{
+			{Name: "AMD Ryzen 7 7700X", Category: "cpu"},
+			{Name: "ASUS TUF Gaming B650-PLUS WIFI", Category: "motherboard"},
+			{Name: "Kingston Fury Renegade 64GB DDR5-6400", Category: "ram"},
+			{Name: "NVIDIA GeForce RTX 4070 SUPER", Category: "gpu"},
+			{Name: "WD Black SN850X 1TB", Category: "ssd"},
+			{Name: "WD Red Plus 4TB", Category: "hdd"},
+			{Name: "ARCTIC Freezer 34 eSports DUO", Category: "cooler"},
+			{Name: "Corsair RM850x SHIFT", Category: "psu"},
+			{Name: "Phanteks Eclipse P400A", Category: "case"},
+		},
+		{
+			{Name: "AMD Ryzen 7 7800X3D", Category: "cpu"},
+			{Name: "ASUS ROG Strix X670E-E Gaming WiFi", Category: "motherboard"},
+			{Name: "Kingston Fury Renegade 64GB DDR5-6400", Category: "ram"},
+			{Name: "NVIDIA GeForce RTX 4070 Ti SUPER 16GB", Category: "gpu"},
+			{Name: "Samsung 990 Pro 4TB", Category: "ssd"},
+			{Name: "Seagate IronWolf 4TB", Category: "hdd"},
+			{Name: "Scythe Fuma 2 Rev.B", Category: "cooler"},
+			{Name: "Corsair HX1000i 1000W", Category: "psu"},
+			{Name: "Phanteks Eclipse G500A", Category: "case"},
+		},
+		{
+			{Name: "AMD Ryzen 9 7950X", Category: "cpu"},
+			{Name: "ASUS ROG Strix X670E-E Gaming WiFi", Category: "motherboard"},
+			{Name: "G.Skill Trident Z5 RGB 32GB DDR5-6000", Category: "ram"}, // x2 → 64GB
+			{Name: "AMD Radeon RX 7900 XT 20GB", Category: "gpu"},
+			{Name: "Crucial T700 2TB", Category: "ssd"},
+			{Name: "Toshiba N300 6TB", Category: "hdd"},
+			{Name: "DeepCool AK620 Digital", Category: "cooler"},
+			{Name: "Corsair HX1000i 1000W", Category: "psu"},
+			{Name: "Fractal Design North", Category: "case"},
+		},
+		{
+			{Name: "AMD Ryzen 9 7950X", Category: "cpu"},
+			{Name: "ASUS ROG Strix X670E-E Gaming WiFi", Category: "motherboard"},
+			{Name: "G.Skill Trident Z5 128GB DDR5-6000", Category: "ram"},
+			{Name: "NVIDIA GeForce RTX 4080 SUPER 16GB", Category: "gpu"},
+			{Name: "Samsung 990 Pro 4TB", Category: "ssd"},
+			{Name: "Toshiba N300 6TB", Category: "hdd"},
+			{Name: "Noctua NH-U12A chromax.black", Category: "cooler"},
+			{Name: "Corsair HX1500i", Category: "psu"},
+			{Name: "Lian Li O11D EVO", Category: "case"},
+		},
+		{
+			{Name: "AMD Ryzen 9 7950X3D", Category: "cpu"},
+			{Name: "ASUS ROG Strix X670E-E Gaming WiFi", Category: "motherboard"},
+			{Name: "G.Skill Trident Z5 128GB DDR5-6000", Category: "ram"},
+			{Name: "AMD Radeon RX 7900 XTX 24GB", Category: "gpu"},
+			{Name: "Samsung 990 Pro 4TB", Category: "ssd"},
+			{Name: "Toshiba N300 6TB", Category: "hdd"},
+			{Name: "Noctua NH-D15", Category: "cooler"},
+			{Name: "Corsair HX1500i", Category: "psu"},
+			{Name: "Lian Li O11D EVO", Category: "case"},
+		},
+	},
+	"cad": {
+		{
+			{Name: "AMD Ryzen 7 7700X", Category: "cpu"},
+			{Name: "ASUS TUF Gaming B650-PLUS WIFI", Category: "motherboard"},
+			{Name: "Corsair Vengeance 32GB DDR5-6000", Category: "ram"},
+			{Name: "NVIDIA GeForce RTX 3060", Category: "gpu"},
+			{Name: "WD Black SN850X 1TB", Category: "ssd"},
+			{Name: "ARCTIC Freezer 34 eSports DUO", Category: "cooler"},
+			{Name: "Seasonic Focus GX-650", Category: "psu"},
+			{Name: "Phanteks Eclipse P400A", Category: "case"},
+		},
+		{
+			{Name: "Intel Core i5-13400F", Category: "cpu"},
+			{Name: "Gigabyte Z790 AORUS Elite AX", Category: "motherboard"},
+			{Name: "Corsair Vengeance 32GB DDR5-6000", Category: "ram"},
+			{Name: "AMD Radeon RX 6700 XT", Category: "gpu"},
+			{Name: "Crucial T700 2TB", Category: "ssd"},
+			{Name: "ARCTIC Freezer 34 eSports DUO", Category: "cooler"},
+			{Name: "Corsair RM750", Category: "psu"},
+			{Name: "Fractal Design North", Category: "case"},
+		},
+		{
+			{Name: "Intel Core i5-14400", Category: "cpu"},
+			{Name: "Gigabyte Z790 AORUS Elite AX", Category: "motherboard"},
+			{Name: "Kingston Fury Renegade 64GB DDR5-6400", Category: "ram"},
+			{Name: "NVIDIA GeForce RTX 4060 8GB", Category: "gpu"},
+			{Name: "Samsung 990 Pro 4TB", Category: "ssd"},
+			{Name: "Scythe Fuma 2 Rev.B", Category: "cooler"},
+			{Name: "Corsair RM850x SHIFT", Category: "psu"},
+			{Name: "Phanteks Eclipse G500A", Category: "case"},
+		},
+		{
+			{Name: "AMD Ryzen 7 7800X3D", Category: "cpu"},
+			{Name: "ASUS ROG Strix X670E-E Gaming WiFi", Category: "motherboard"},
+			{Name: "Kingston Fury Renegade 64GB DDR5-6400", Category: "ram"},
+			{Name: "NVIDIA GeForce RTX 4070 SUPER", Category: "gpu"},
+			{Name: "Samsung 990 Pro 4TB", Category: "ssd"},
+			{Name: "DeepCool AK620 Digital", Category: "cooler"},
+			{Name: "Corsair HX1000i 1000W", Category: "psu"},
+			{Name: "Lian Li O11D EVO", Category: "case"},
+		},
+		{
+			{Name: "Intel Core i7-14700K", Category: "cpu"},
+			{Name: "Gigabyte Z790 AORUS Master", Category: "motherboard"},
+			{Name: "G.Skill Trident Z5 128GB DDR5-6000", Category: "ram"}, // можно заменить на 64GB при необходимости
+			{Name: "NVIDIA GeForce RTX 4080 SUPER 16GB", Category: "gpu"}, // превышает 12GB — если критично, скажи
+			{Name: "Crucial T700 2TB", Category: "ssd"},
+			{Name: "Noctua NH-U12A chromax.black", Category: "cooler"},
+			{Name: "Corsair HX1000i 1000W", Category: "psu"},
+			{Name: "Lian Li O11D EVO", Category: "case"},
+		},
+	},
+	"dev": {
+		{
+			{Name: "Intel Core i3-12100F", Category: "cpu"},
+			{Name: "Gigabyte H610M K", Category: "motherboard"},
+			{Name: "Kingston Fury 32GB DDR4-3600", Category: "ram"},
+			{Name: "AMD Radeon RX 6400 4GB", Category: "gpu"},
+			{Name: "WD Blue SN550 500GB", Category: "ssd"},
+			{Name: "WD Blue 1TB", Category: "hdd"},
+			{Name: "ARCTIC Freezer 34 eSports DUO", Category: "cooler"},
+			{Name: "Corsair RM750e", Category: "psu"},
+			{Name: "Phanteks Eclipse P400A", Category: "case"},
+		},
+		{
+			{Name: "AMD Ryzen 5 5600X", Category: "cpu"},
+			{Name: "MSI B550 Tomahawk", Category: "motherboard"},
+			{Name: "Corsair Vengeance LPX 16GB DDR4-3200", Category: "ram"},
+			{Name: "AMD Radeon RX 6400 4GB", Category: "gpu"},
+			{Name: "WD Black SN770 1TB", Category: "ssd"},
+			{Name: "WD Blue 1TB", Category: "hdd"},
+			{Name: "BeQuiet Shadow Rock 3", Category: "cooler"},
+			{Name: "Corsair RM750e", Category: "psu"},
+			{Name: "Phanteks Eclipse P400A", Category: "case"},
+		},
+		{
+			{Name: "Intel Core i5-12400", Category: "cpu"},
+			{Name: "ASUS PRIME B660-PLUS", Category: "motherboard"},
+			{Name: "Kingston Fury 32GB DDR4-3600", Category: "ram"},
+			{Name: "NVIDIA GeForce GTX 1660 6GB", Category: "gpu"},
+			{Name: "Crucial P3 1TB", Category: "ssd"},
+			{Name: "WD Blue 1TB", Category: "hdd"},
+			{Name: "ARCTIC Freezer 34 eSports DUO", Category: "cooler"},
+			{Name: "Corsair RM750e", Category: "psu"},
+			{Name: "Phanteks Eclipse P400A", Category: "case"},
+		},
+		{
+			{Name: "Intel Core i5-13400F", Category: "cpu"},
+			{Name: "Gigabyte Z790 AORUS Elite AX", Category: "motherboard"},
+			{Name: "Kingston Fury 32GB DDR4-3600", Category: "ram"},
+			{Name: "AMD Radeon RX 6400 4GB", Category: "gpu"},
+			{Name: "Crucial P5 500GB", Category: "ssd"},
+			{Name: "WD Blue 1TB", Category: "hdd"},
+			{Name: "Scythe Fuma 2 Rev.B", Category: "cooler"},
+			{Name: "Corsair RM750e", Category: "psu"},
+			{Name: "Fractal Design North", Category: "case"},
+		},
+		{
+			{Name: "AMD Ryzen 5 5600X", Category: "cpu"},
+			{Name: "MSI B550 Tomahawk", Category: "motherboard"},
+			{Name: "Corsair Vengeance LPX 16GB DDR4-3200", Category: "ram"},
+			{Name: "NVIDIA GeForce GTX 1660 6GB", Category: "gpu"},
+			{Name: "WD Black SN850X 1TB", Category: "ssd"},
+			{Name: "WD Blue 1TB", Category: "hdd"},
+			{Name: "ARCTIC Freezer 34 eSports DUO", Category: "cooler"},
+			{Name: "Corsair RM750e", Category: "psu"},
+			{Name: "Fractal Design North", Category: "case"},
+		},
+	},
+	"enthusiast": {
+		{
+			{Name: "Intel Core i9-14900K", Category: "cpu"},
+			{Name: "Gigabyte Z790 AORUS Master", Category: "motherboard"},
+			{Name: "G.Skill Trident Z5 128GB DDR5-6000", Category: "ram"},
+			{Name: "NVIDIA GeForce RTX 4090", Category: "gpu"},
+			{Name: "Crucial T700 2TB", Category: "ssd"},
+			{Name: "DeepCool AK620 Digital", Category: "cooler"},
+			{Name: "Corsair HX1500i", Category: "psu"},
+			{Name: "Lian Li O11D EVO", Category: "case"},
+		},
+		{
+			{Name: "AMD Ryzen 7 7800X3D", Category: "cpu"},
+			{Name: "ASUS ROG Strix X670E-E Gaming WiFi", Category: "motherboard"},
+			{Name: "Kingston Fury Renegade 64GB DDR5-6400", Category: "ram"},
+			{Name: "NVIDIA GeForce RTX 4070 Ti SUPER 16GB", Category: "gpu"},
+			{Name: "Samsung 990 Pro 4TB", Category: "ssd"},
+			{Name: "Thermalright Peerless Assassin 120 SE", Category: "cooler"},
+			{Name: "Corsair HX1000i 1000W", Category: "psu"},
+			{Name: "Lian Li O11D EVO", Category: "case"},
+		},
+		{
+			{Name: "AMD Ryzen 9 7950X", Category: "cpu"},
+			{Name: "ASUS ROG Strix X670E-E Gaming WiFi", Category: "motherboard"},
+			{Name: "Kingston Fury Renegade 64GB DDR5-6400", Category: "ram"},
+			{Name: "AMD Radeon RX 7900 XT 20GB", Category: "gpu"},
+			{Name: "Samsung 990 Pro 4TB", Category: "ssd"},
+			{Name: "Noctua NH-U12A chromax.black", Category: "cooler"},
+			{Name: "Corsair HX1000i 1000W", Category: "psu"},
+			{Name: "Phanteks Eclipse G500A", Category: "case"},
+		},
+		{
+			{Name: "Intel Core i7-14700K", Category: "cpu"},
+			{Name: "Gigabyte Z790 AORUS Master", Category: "motherboard"},
+			{Name: "G.Skill Trident Z5 128GB DDR5-6000", Category: "ram"},
+			{Name: "NVIDIA GeForce RTX 4080 SUPER 16GB", Category: "gpu"},
+			{Name: "Crucial T700 2TB", Category: "ssd"},
+			{Name: "Noctua NH-U12A chromax.black", Category: "cooler"},
+			{Name: "Corsair HX1500i", Category: "psu"},
+			{Name: "Lian Li O11D EVO", Category: "case"},
+		},
+		{
+			{Name: "AMD Ryzen 9 7950X3D", Category: "cpu"},
+			{Name: "ASUS ROG Strix X670E-E Gaming WiFi", Category: "motherboard"},
+			{Name: "Kingston Fury Renegade 64GB DDR5-6400", Category: "ram"},
+			{Name: "AMD Radeon RX 7900 XTX 24GB", Category: "gpu"},
+			{Name: "Samsung 990 Pro 4TB", Category: "ssd"},
+			{Name: "Noctua NH-D15", Category: "cooler"},
+			{Name: "Corsair HX1000i 1000W", Category: "psu"},
+			{Name: "Phanteks Eclipse G500A", Category: "case"},
+		},
+	},
+	"nas": {
+		{
+			{Name: "Intel Pentium Gold G7400T", Category: "cpu"},
+			{Name: "Gigabyte H610M K", Category: "motherboard"},
+			{Name: "Kingston ValueRAM 8GB DDR4-2666", Category: "ram"},
+			{Name: "Kingston A400 480GB", Category: "ssd"},
+			{Name: "Seagate IronWolf 4TB", Category: "hdd"},
+			{Name: "Seasonic SSP-300ET", Category: "psu"},
+			{Name: "DeepCool Matrexx 30", Category: "case"},
+		},
+		{
+			{Name: "AMD Athlon 3000G", Category: "cpu"},
+			{Name: "ASUS PRIME A320M-K", Category: "motherboard"},
+			{Name: "Kingston ValueRAM 8GB DDR4-2666", Category: "ram"},
+			{Name: "ADATA SU650 240GB", Category: "ssd"},
+			{Name: "Toshiba N300 6TB", Category: "hdd"},
+			{Name: "Seasonic SSP-300ET", Category: "psu"},
+			{Name: "DeepCool Matrexx 30", Category: "case"},
+		},
+		{
+			{Name: "Intel Core i3-12100T", Category: "cpu"},
+			{Name: "Gigabyte H610M K", Category: "motherboard"},
+			{Name: "Kingston Fury 32GB DDR4-3600", Category: "ram"},
+			{Name: "Crucial P3 1TB", Category: "ssd"},
+			{Name: "WD Red Plus 4TB", Category: "hdd"},
+			{Name: "SilverStone ST30SF V2.0", Category: "psu"},
+			{Name: "SilverStone SG13", Category: "case"},
+		},
+		{
+			{Name: "AMD Ryzen 5 5600GE", Category: "cpu"},
+			{Name: "ASUS PRIME A320M-K", Category: "motherboard"},
+			{Name: "Corsair Vengeance LPX 16GB DDR4-3200", Category: "ram"},
+			{Name: "Kingston A400 480GB", Category: "ssd"},
+			{Name: "WD Red Plus 4TB", Category: "hdd"},
+			{Name: "SilverStone ST30SF V2.0", Category: "psu"},
+			{Name: "Fractal Design Node 202", Category: "case"},
+		},
+		{
+			{Name: "Intel Core i5-13600T", Category: "cpu"},
+			{Name: "Gigabyte H610M K", Category: "motherboard"},
+			{Name: "Kingston Fury 32GB DDR4-3600", Category: "ram"},
+			{Name: "Kingston NV2 500GB", Category: "ssd"},
+			{Name: "Seagate IronWolf 4TB", Category: "hdd"},
+			{Name: "SilverStone ST30SF V2.0", Category: "psu"},
+			{Name: "Fractal Design Node 202", Category: "case"},
+		},
+	},
+}
+
+// GetUseCaseBuild возвращает список сборок по сценарию использования
+func (s *configService) GetUseCaseBuild(usecase string, limit int) ([]domain.NamedBuild, error) {
+	builds, ok := PredefinedBuilds[usecase]
+	if !ok {
+		return nil, fmt.Errorf("unknown use-case %q", usecase)
+	}
+
+	out := make([]domain.NamedBuild, 0, limit)
+
+	for rank, items := range builds {
+		if len(out) >= limit {
+			break
+		}
+
+		var comps []domain.Component
+		for _, item := range items {
+			c, err := s.repo.GetComponentByName(item.Category, item.Name)
+			if err != nil {
+				return nil, fmt.Errorf("component %q not found in DB: %w", item.Name, err)
+			}
+			comps = append(comps, c)
+		}
+
+		out = append(out, domain.NamedBuild{
+			Name:       buildLabels[rank],
+			Components: comps,
+		})
+	}
+
+	if len(out) == 0 {
+		return nil, fmt.Errorf("no builds available for %s", usecase)
 	}
 	return out, nil
-
 }
 
-var caseSupportedMap = map[string][]string{
-	"ATX":       {"ATX", "Micro-ATX", "Mini-ITX"},
-	"MICRO-ATX": {"Micro-ATX", "Mini-ITX"},
-	"MINI-ITX":  {"Mini-ITX"},
-}
-
-// Вспомогательная: распаковка JSONB в map[string]interface{}
-func parseSpecs(raw json.RawMessage) map[string]interface{} {
-	var m map[string]interface{}
-	json.Unmarshal(raw, &m)
-	return m
-}
-
-// Вспомогательная: поиск строки в срезе
-func contains(ss []string, s string) bool {
-	for _, x := range ss {
-		if strings.EqualFold(x, s) {
-			return true
+// helper — найти CPU в комбо
+func findCPU(combo []domain.Component) *domain.Component {
+	for i := range combo {
+		if strings.EqualFold(combo[i].Category, "cpu") {
+			return &combo[i]
 		}
 	}
-	return false
+	return nil
 }
 
 func cpuMatches(c domain.Component, rule rules.ScenarioRule) bool {
@@ -1165,6 +1600,29 @@ func hddMatches(c domain.Component, rule rules.ScenarioRule) bool {
 	}
 
 	return true
+}
+
+var caseSupportedMap = map[string][]string{
+	"ATX":       {"ATX", "Micro-ATX", "Mini-ITX"},
+	"MICRO-ATX": {"Micro-ATX", "Mini-ITX"},
+	"MINI-ITX":  {"Mini-ITX"},
+}
+
+// Вспомогательная: распаковка JSONB в map[string]interface{}
+func parseSpecs(raw json.RawMessage) map[string]interface{} {
+	var m map[string]interface{}
+	json.Unmarshal(raw, &m)
+	return m
+}
+
+// Вспомогательная: поиск строки в срезе
+func contains(ss []string, s string) bool {
+	for _, x := range ss {
+		if strings.EqualFold(x, s) {
+			return true
+		}
+	}
+	return false
 }
 
 // веса одного сценария
