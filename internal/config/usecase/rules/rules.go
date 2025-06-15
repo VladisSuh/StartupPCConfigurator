@@ -19,41 +19,38 @@ var ScenarioRules = map[string]ScenarioRule{
 		CPUSocketWhitelist: []string{"AM4", "LGA1700"},
 		MinCPUTDP:          0, MaxCPUTDP: 35,
 		RAMType: "DDR4",
-		MinRAM:  4, MaxRAM: 16,
-		MinGPUMemory: 0, MaxGPUMemory: 4,
+		MinRAM:  4, MaxRAM: 8,
+		MinGPUMemory: 0, MaxGPUMemory: 2,
 		MinPSUPower: 150, MaxPSUPower: 300,
 		CaseFormFactors:  []string{"Mini-ITX", "Micro-ATX"},
 		MinSSDThroughput: 0,
-		SSDFormFactors:   []string{"M.2", "2.5"},
+		SSDFormFactors:   []string{"SATA", "2.5"},
 		MinHDDCapacity:   0, MaxHDDCapacity: 0,
 	},
-
 	"gaming": {
-		CPUSocketWhitelist: []string{"AM4", "LGA1700", "AM5"},
-		MinCPUTDP:          65, MaxCPUTDP: 125,
+		CPUSocketWhitelist: []string{"AM5", "LGA1700", "AM4"},
+		MinCPUTDP:          85, MaxCPUTDP: 125,
 		RAMType: "DDR4",
-		MinRAM:  16, MaxRAM: 64,
-		MinGPUMemory: 6, MaxGPUMemory: 16,
-		MinPSUPower: 650, MaxPSUPower: 1000,
-		CaseFormFactors:  []string{"ATX", "Micro-ATX"},
-		MinSSDThroughput: 3000,
+		MinRAM:  32, MaxRAM: 64,
+		MinGPUMemory: 8, MaxGPUMemory: 24,
+		MinPSUPower: 750, MaxPSUPower: 1000,
+		CaseFormFactors:  []string{"ATX"},
+		MinSSDThroughput: 3500,
 		SSDFormFactors:   []string{"M.2"},
 		MinHDDCapacity:   0, MaxHDDCapacity: 0,
 	},
-
 	"htpc": {
 		CPUSocketWhitelist: []string{"AM4", "LGA1700"},
 		MinCPUTDP:          0, MaxCPUTDP: 35,
 		RAMType: "DDR4",
 		MinRAM:  8, MaxRAM: 16,
 		MinGPUMemory: 0, MaxGPUMemory: 4,
-		MinPSUPower: 300, MaxPSUPower: 500,
+		MinPSUPower: 150, MaxPSUPower: 350,
 		CaseFormFactors:  []string{"Mini-ITX"},
-		MinSSDThroughput: 0,
+		MinSSDThroughput: 200,
 		SSDFormFactors:   []string{"M.2", "2.5"},
-		MinHDDCapacity:   500, MaxHDDCapacity: 8000, // фильмы и музыка
+		MinHDDCapacity:   500, MaxHDDCapacity: 8000,
 	},
-
 	"streamer": {
 		CPUSocketWhitelist: []string{"AM4", "LGA1700", "AM5"},
 		MinCPUTDP:          65, MaxCPUTDP: 125,
@@ -66,7 +63,6 @@ var ScenarioRules = map[string]ScenarioRule{
 		SSDFormFactors:   []string{"M.2"},
 		MinHDDCapacity:   0, MaxHDDCapacity: 0,
 	},
-
 	"design": {
 		CPUSocketWhitelist: []string{"AM5"},
 		MinCPUTDP:          95, MaxCPUTDP: 170,
@@ -75,11 +71,10 @@ var ScenarioRules = map[string]ScenarioRule{
 		MinGPUMemory: 10, MaxGPUMemory: 24,
 		MinPSUPower: 650, MaxPSUPower: 1200,
 		CaseFormFactors:  []string{"ATX"},
-		MinSSDThroughput: 2000,
+		MinSSDThroughput: 3000,
 		SSDFormFactors:   []string{"M.2"},
-		MinHDDCapacity:   256, MaxHDDCapacity: 8000, // большие проекты и библиотека
+		MinHDDCapacity:   256, MaxHDDCapacity: 8000,
 	},
-
 	"video": {
 		CPUSocketWhitelist: []string{"AM5"},
 		MinCPUTDP:          95, MaxCPUTDP: 170,
@@ -90,9 +85,8 @@ var ScenarioRules = map[string]ScenarioRule{
 		CaseFormFactors:  []string{"ATX"},
 		MinSSDThroughput: 3000,
 		SSDFormFactors:   []string{"M.2"},
-		MinHDDCapacity:   1000, MaxHDDCapacity: 16000, // видеопроекты под архив
+		MinHDDCapacity:   1000, MaxHDDCapacity: 16000,
 	},
-
 	"cad": {
 		CPUSocketWhitelist: []string{"AM5", "LGA1700"},
 		MinCPUTDP:          95, MaxCPUTDP: 170,
@@ -105,33 +99,30 @@ var ScenarioRules = map[string]ScenarioRule{
 		SSDFormFactors:   []string{"M.2"},
 		MinHDDCapacity:   0, MaxHDDCapacity: 0,
 	},
-
 	"dev": {
 		CPUSocketWhitelist: []string{"AM4", "LGA1700"},
-		MinCPUTDP:          35, MaxCPUTDP: 95,
+		MinCPUTDP:          65, MaxCPUTDP: 105,
 		RAMType: "DDR4",
-		MinRAM:  16, MaxRAM: 64,
-		MinGPUMemory: 0, MaxGPUMemory: 8,
-		MinPSUPower: 550, MaxPSUPower: 800,
-		CaseFormFactors:  []string{"ATX", "Micro-ATX", "Mini-ITX"},
-		MinSSDThroughput: 1000,
+		MinRAM:  32, MaxRAM: 64,
+		MinGPUMemory: 4, MaxGPUMemory: 12,
+		MinPSUPower: 550, MaxPSUPower: 850,
+		CaseFormFactors:  []string{"ATX", "Micro-ATX"},
+		MinSSDThroughput: 2000,
 		SSDFormFactors:   []string{"M.2", "2.5"},
-		MinHDDCapacity:   0, MaxHDDCapacity: 8000,
+		MinHDDCapacity:   0, MaxHDDCapacity: 2000,
 	},
-
 	"enthusiast": {
 		CPUSocketWhitelist: []string{"AM5", "LGA1700"},
 		MinCPUTDP:          65, MaxCPUTDP: 170,
 		RAMType: "DDR5",
 		MinRAM:  32, MaxRAM: 128,
-		MinGPUMemory: 8, MaxGPUMemory: 24,
+		MinGPUMemory: 10, MaxGPUMemory: 24,
 		MinPSUPower: 650, MaxPSUPower: 1500,
 		CaseFormFactors:  []string{"ATX"},
 		MinSSDThroughput: 4000,
 		SSDFormFactors:   []string{"M.2"},
 		MinHDDCapacity:   0, MaxHDDCapacity: 0,
 	},
-
 	"nas": {
 		CPUSocketWhitelist: []string{"AM4", "LGA1700"},
 		MinCPUTDP:          0, MaxCPUTDP: 65,
@@ -140,8 +131,8 @@ var ScenarioRules = map[string]ScenarioRule{
 		MinGPUMemory: 0, MaxGPUMemory: 4,
 		MinPSUPower: 300, MaxPSUPower: 500,
 		CaseFormFactors:  []string{"Mini-ITX", "Micro-ATX"},
-		MinSSDThroughput: 0,
+		MinSSDThroughput: 100,
 		SSDFormFactors:   []string{"2.5", "M.2"},
-		MinHDDCapacity:   2000, MaxHDDCapacity: 16000, // первичный сценарий для HDD
+		MinHDDCapacity:   2000, MaxHDDCapacity: 16000,
 	},
 }

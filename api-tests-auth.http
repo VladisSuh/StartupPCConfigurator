@@ -109,7 +109,7 @@ Authorization: Bearer {{access_token}}
 GET {{config_host}}/config/components
 
 ### 11.1 получить компоненты по категории
-GET {{config_host}}/config/components?category=cooler
+GET {{config_host}}/config/components?category=ssd
 
 ### 11.2 получить компоненты по категории и бренду
 GET {{config_host}}/config/components?category=hdd&brand=Seagate
@@ -255,6 +255,19 @@ Content-Type: application/json
   ]
 }
 
+### 5) Case
+POST  {{config_host}}/config/compatible
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+  "category": "case",
+  "bases": [
+    { "category":"cpu", "name":"AMD Ryzen 5 5600X" },
+    { "category":"ssd", "name":"Sabrent Rocket 4 Plus 2TB" }
+  ]
+}
+
 ################################################################################
 ### 17. получить список сценариев
 GET {{config_host}}/config/usecases
@@ -271,7 +284,7 @@ GET http://localhost:8080/offers?componentId=1&sort=priceAsc
 Authorization: Bearer {{access_token}}
 
 ### 20. Минимальная цена агрегатора
-GET http://localhost:8080/offers/min?componentId=72
+GET http://localhost:8080/offers/min?componentId=12
 
 ###################Не работает в REST-тестах
 POST http://localhost:8080/offers/import

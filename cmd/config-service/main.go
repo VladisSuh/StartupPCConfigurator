@@ -3,6 +3,8 @@ package main
 import (
 	"database/sql"
 	"log"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 
 	"StartupPCConfigurator/internal/config/handlers"
@@ -16,6 +18,14 @@ import (
 )
 
 func main() {
+	go func() {
+		log.Println("pprof listening on :6060")
+		// http.DefaultServeMux уже содержит все /debug/pprof/* handlers
+		if err := http.ListenAndServe(":6060", nil); err != nil {
+			log.Fatalf("pprof ListenAndServe failed: %v", err)
+		}
+	}()
+
 	// 1. Инициализируем соединение с БД
 	dsn := os.Getenv("DB_CONN_STR")
 	if dsn == "" {

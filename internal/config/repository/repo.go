@@ -2,6 +2,7 @@ package repository
 
 import (
 	"StartupPCConfigurator/internal/domain"
+	"context"
 	"database/sql"
 	"fmt"
 	_ "fmt"
@@ -28,6 +29,7 @@ type ConfigRepository interface {
 	GetComponentsByFilters(category string, brand *string) ([]domain.Component, error)
 	GetComponentsByCategory(category string) ([]domain.Component, error)
 	FilterPoolByCompatibility(pool []domain.Component, filter domain.CompatibilityFilter) ([]domain.Component, error)
+	GetComponentsFiltered(ctx context.Context, f ComponentFilter) ([]domain.Component, error) // ← НОВОЕ
 }
 
 // Реализация
@@ -110,51 +112,17 @@ func NewConfigRepository(db *sql.DB) ConfigRepository {
 	return &configRepository{db: db}
 }
 
-// Пример метода GetComponents
 // Реализация метода GetComponents
-// старый метод замените на:
+
 func (r *configRepository) GetComponents(category, search, brand string) ([]domain.Component, error) {
-	var (
-		args  []interface{}
-		where []string
-		idx   = 1
-	)
+	f := ComponentFilter{
+		NameILike: search,
+		BrandEQ:   brand,
+	}
 	if category != "" {
-		where = append(where, fmt.Sprintf("category = $%d", idx))
-		args = append(args, category)
-		idx++
+		f.Categories = []string{category}
 	}
-	if search != "" {
-		where = append(where, fmt.Sprintf("LOWER(name) ILIKE LOWER($%d)", idx))
-		args = append(args, "%"+search+"%")
-		idx++
-	}
-	if brand != "" {
-		where = append(where, fmt.Sprintf("LOWER(brand) = LOWER($%d)", idx))
-		args = append(args, brand)
-		idx++
-	}
-
-	q := "SELECT id, name, category, brand, specs FROM components"
-	if len(where) > 0 {
-		q += " WHERE " + strings.Join(where, " AND ")
-	}
-
-	rows, err := r.db.Query(q, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var out []domain.Component
-	for rows.Next() {
-		var c domain.Component
-		if err := rows.Scan(&c.ID, &c.Name, &c.Category, &c.Brand, &c.Specs); err != nil {
-			return nil, err
-		}
-		out = append(out, c)
-	}
-	return out, nil
+	return r.GetComponentsFiltered(context.Background(), f)
 }
 
 func (r *configRepository) CreateConfiguration(
@@ -629,4 +597,128 @@ func (r *configRepository) FilterPoolByCompatibility(
 		result = append(result, c)
 	}
 	return result, nil
+}
+
+// repository/repository.go
+
+type ComponentFilter struct {
+	// уже существующие
+	Categories []string
+	NameILike  string
+	BrandEQ    string
+
+	// новое для сценариев
+	SocketWhitelist          []string
+	RAMType                  string
+	MinTDP, MaxTDP           int
+	MinRAM, MaxRAM           int
+	MinGPUMem, MaxGPUMem     int
+	MinPSUPower, MaxPSUPower int
+	MinHDDCap, MaxHDDCap     int
+	MinSSDTP                 int
+	CaseFormFactors          []string
+	SSDFormFactors           []string // если захотите
+}
+
+func (r *configRepository) GetComponentsFiltered(
+	ctx context.Context,
+	f ComponentFilter,
+) ([]domain.Component, error) {
+	var (
+		sb   strings.Builder
+		args []any
+		idx  = 1
+	)
+
+	sb.WriteString(`
+        SELECT id, name, category, brand, specs, created_at, updated_at
+          FROM components
+         WHERE TRUE
+    `)
+
+	// --- категории ---------------------------------------------------------
+	if len(f.Categories) > 0 {
+		sb.WriteString(" AND category = ANY($" + strconv.Itoa(idx) + ")")
+		args = append(args, pq.Array(f.Categories))
+		idx++
+	}
+
+	// --- поиск по имени ----------------------------------------------------
+	if f.NameILike != "" {
+		sb.WriteString(" AND LOWER(name) ILIKE LOWER($" + strconv.Itoa(idx) + ")")
+		args = append(args, "%"+f.NameILike+"%")
+		idx++
+	}
+
+	// --- бренд --------------------------------------------------------------
+	if f.BrandEQ != "" {
+		sb.WriteString(" AND LOWER(brand) = LOWER($" + strconv.Itoa(idx) + ")")
+		args = append(args, f.BrandEQ)
+		idx++
+	}
+
+	// --- сокет (для CPU, MB, кулеров) ---------------------------------------
+	if len(f.SocketWhitelist) > 0 {
+		sb.WriteString(" AND socket = ANY($" + strconv.Itoa(idx) + ")")
+		args = append(args, pq.Array(f.SocketWhitelist))
+		idx++
+	}
+
+	// --- форм-фактор корпуса ------------------------------------------------
+	if len(f.CaseFormFactors) > 0 {
+		sb.WriteString(" AND form_factor = ANY($" + strconv.Itoa(idx) + ")")
+		args = append(args, pq.Array(f.CaseFormFactors))
+		idx++
+	}
+
+	// --- RAM‐тип ------------------------------------------------------------
+	if f.RAMType != "" {
+		sb.WriteString(" AND ram_type = $" + strconv.Itoa(idx))
+		args = append(args, f.RAMType)
+		idx++
+	}
+
+	// --- числовые диапазоны по generated-columns --------------------------
+	addRange := func(col string, min, max int) {
+		if min > 0 {
+			sb.WriteString(" AND " + col + " >= $" + strconv.Itoa(idx))
+			args = append(args, min)
+			idx++
+		}
+		if max > 0 {
+			sb.WriteString(" AND " + col + " <= $" + strconv.Itoa(idx))
+			args = append(args, max)
+			idx++
+		}
+	}
+
+	// CPU TDP
+	addRange("tdp", f.MinTDP, f.MaxTDP)
+	// RAM capacity (generated column `capacity`)
+	addRange("capacity", f.MinRAM, f.MaxRAM)
+	// GPU memory (generated column `memory_gb`)
+	addRange("memory_gb", f.MinGPUMem, f.MaxGPUMem)
+	// SSD throughput (generated column `max_throughput`)
+	addRange("max_throughput", f.MinSSDTP, 0)
+	// HDD capacity (generated column `capacity_gb`)
+	addRange("capacity_gb", f.MinHDDCap, f.MaxHDDCap)
+
+	rows, err := r.db.QueryContext(ctx, sb.String(), args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []domain.Component
+	for rows.Next() {
+		var c domain.Component
+		if err := rows.Scan(
+			&c.ID, &c.Name, &c.Category, &c.Brand,
+			&c.Specs, &c.CreatedAt, &c.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		out = append(out, c)
+	}
+	return out, rows.Err()
 }

@@ -643,3 +643,65 @@ VALUES (
 -- ===================================================================
 -- End of Script
 -- ===================================================================
+
+
+
+-- --------------------------------------------------------
+-- 1.1 Часто-используемые поля из JSONB как generated columns
+--     (движок сам вытянет их из specs при INSERT/UPDATE)
+-- --------------------------------------------------------
+ALTER TABLE components
+    ADD COLUMN IF NOT EXISTS socket       TEXT GENERATED ALWAYS AS (specs->>'socket')       STORED,
+    ADD COLUMN IF NOT EXISTS ram_type     TEXT GENERATED ALWAYS AS (specs->>'ram_type')     STORED,
+    ADD COLUMN IF NOT EXISTS tdp          INT  GENERATED ALWAYS AS ((specs->>'tdp')::INT)   STORED,
+    ADD COLUMN IF NOT EXISTS capacity_gb  INT  GENERATED ALWAYS AS ((specs->>'capacity_gb')::INT) STORED,
+    ADD COLUMN IF NOT EXISTS memory_gb    INT  GENERATED ALWAYS AS ((specs->>'memory_gb')::INT)   STORED,
+    ADD COLUMN IF NOT EXISTS power        INT  GENERATED ALWAYS AS ((specs->>'power')::INT) STORED,
+    ADD COLUMN IF NOT EXISTS max_throughput INT GENERATED ALWAYS AS ((specs->>'max_throughput')::INT) STORED,
+  ADD COLUMN IF NOT EXISTS pcie_version TEXT  GENERATED ALWAYS AS (specs->>'pcie_version') STORED,
+  ADD COLUMN IF NOT EXISTS sata_ports    INT   GENERATED ALWAYS AS ((specs->>'sata_ports')::INT) STORED,
+  ADD COLUMN IF NOT EXISTS drive_bays_2_5 INT  GENERATED ALWAYS AS ((specs->>'drive_bays_2_5')::INT) STORED,
+  ADD COLUMN IF NOT EXISTS drive_bays_3_5 INT  GENERATED ALWAYS AS ((specs->>'drive_bays_3_5')::INT) STORED,
+  ADD COLUMN IF NOT EXISTS gpu_max_length INT  GENERATED ALWAYS AS ((specs->>'gpu_max_length')::INT) STORED,
+  ADD COLUMN IF NOT EXISTS cooler_max_height INT GENERATED ALWAYS AS ((specs->>'cooler_max_height')::INT) STORED;
+
+CREATE INDEX IF NOT EXISTS idx_components_pcie_version     ON components(pcie_version);
+CREATE INDEX IF NOT EXISTS idx_components_sata_ports        ON components(sata_ports);
+CREATE INDEX IF NOT EXISTS idx_components_drive_bays_2_5    ON components(drive_bays_2_5);
+CREATE INDEX IF NOT EXISTS idx_components_drive_bays_3_5    ON components(drive_bays_3_5);
+CREATE INDEX IF NOT EXISTS idx_components_gpu_max_length    ON components(gpu_max_length);
+CREATE INDEX IF NOT EXISTS idx_components_cooler_max_height ON components(cooler_max_height);
+
+-- --------------------------------------------------------
+-- 1.2 Индексы на «плоских» колонках (B-tree) и GIN-индекс
+-- --------------------------------------------------------
+CREATE INDEX IF NOT EXISTS idx_components_socket     ON components(socket);
+CREATE INDEX IF NOT EXISTS idx_components_ram_type   ON components(ram_type);
+CREATE INDEX IF NOT EXISTS idx_components_tdp        ON components(tdp);
+CREATE INDEX IF NOT EXISTS idx_components_capacity   ON components(capacity_gb);
+CREATE INDEX IF NOT EXISTS idx_components_memory_gb  ON components(memory_gb);
+CREATE INDEX IF NOT EXISTS idx_components_power      ON components(power);
+CREATE INDEX IF NOT EXISTS idx_components_max_tp     ON components(max_throughput);
+
+
+-- 1. Добавляем GENERATED-колонку form_factor из JSONB
+ALTER TABLE components
+  ADD COLUMN IF NOT EXISTS form_factor TEXT
+    GENERATED ALWAYS AS (specs->>'form_factor') STORED;
+
+-- 2. Создаём B-tree-индекс на неё
+CREATE INDEX IF NOT EXISTS idx_components_form_factor
+  ON components(form_factor);
+
+-- 1) GENERATED-колонка для RAM.capacity
+ALTER TABLE components
+  ADD COLUMN IF NOT EXISTS capacity INT
+    GENERATED ALWAYS AS ((specs->>'capacity')::INT) STORED;
+
+-- 2) B-tree-индекс на неё
+CREATE INDEX IF NOT EXISTS idx_components_capacity
+  ON components(capacity);
+
+-- GIN по-прежнему нужен для редких произвольных запросов:
+CREATE INDEX IF NOT EXISTS idx_components_specs_gin ON components USING gIN (specs);
+
