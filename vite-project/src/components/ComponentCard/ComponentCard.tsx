@@ -7,9 +7,10 @@ import ComponentDetails from '../ComponentDetails/ComponentDetails';
 import { useAuth } from '../../AuthContext';
 import Login from '../Login/component';
 import Register from '../Register/component';
+import { useConfig } from '../../ConfigContext';
 
 
-export const ComponentCard = ({ component, onSelect, selected }: ComponentCardProps) => {
+export const ComponentCard = ({ component, onSelect, selected, onPriceLoaded }: ComponentCardProps) => {
   const [minPrice, setMinPrice] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -21,6 +22,7 @@ export const ComponentCard = ({ component, onSelect, selected }: ComponentCardPr
   const { isAuthenticated, getToken } = useAuth();
   const [isVisible, setIsVisible] = useState(false);
   const [openComponent, setOpenComponent] = useState('login');
+  const { theme } = useConfig();
 
 
   useEffect(() => {
@@ -47,6 +49,44 @@ export const ComponentCard = ({ component, onSelect, selected }: ComponentCardPr
 
         if (data && typeof data.minPrice === 'number') {
           setMinPrice(data.minPrice);
+          onPriceLoaded(data.minPrice);
+        }
+      } catch (err) {
+        setError('Не удалось загрузить минимальную цену');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchMinPrice();
+
+  }, [component.id]);
+
+  useEffect(() => {
+    const fetchMinPrice = async () => {
+      try {
+        //setIsLoading(true);
+        const response = await fetch(
+          `http://localhost:8080/offers/min?componentId=${component.id}`,
+          {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            }
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error('Ошибка при загрузке минимальной цены');
+        }
+
+        const data = await response.json();
+        console.log('Минимальная цена:', data);
+
+        if (data && typeof data.minPrice === 'number') {
+          setMinPrice(data.minPrice);
+          onPriceLoaded(data.minPrice);
         }
       } catch (err) {
         setError('Не удалось загрузить минимальную цену');
@@ -148,19 +188,19 @@ export const ComponentCard = ({ component, onSelect, selected }: ComponentCardPr
 
   return (
     <div className={styles.card}>
-      <div className={styles.card__info}>
-        <div className={styles.card__title}>
+      <div className={styles.info}>
+        <div className={styles.title}>
           {component.name}
         </div>
 
-        <div className={styles.card__infoText}>
+        <div className={styles.infoText}>
           {Object.values(component.specs)
             .map(value => String(value).trim())
             .join(', ')}
         </div>
 
         <div
-          className={styles.card__details}
+          className={`${styles.details} ${styles[theme]}`}
           onClick={() => {
             setIsDetailsVisible(true)
             fetchOffers()
@@ -169,7 +209,7 @@ export const ComponentCard = ({ component, onSelect, selected }: ComponentCardPr
         </div>
       </div>
 
-      <div className={styles.card__price}>
+      <div className={styles.price}>
         <div>
           {isLoading ? (
             'Загрузка...'
@@ -182,39 +222,48 @@ export const ComponentCard = ({ component, onSelect, selected }: ComponentCardPr
           )}
         </div>
 
-        <img src='src/assets/bell-icon.png' onClick={subscribeToComponent} className={styles.notificationIcon} alt='подписка на уведомления' title='Подписаться на уведомления' />
-
+        <div onClick={subscribeToComponent}>
+          {theme === 'dark' ? (
+            <img
+              className={styles.notification}
+              src="src/assets/notifications-active-light.svg"
+              alt="Подписка на уведомления"
+            />
+          ) : (
+            <img
+              className={styles.notification}
+              src="src/assets/notifications-active-dark.svg"
+              alt="Подписка на уведомления"
+            />
+          )}
+        </div>
       </div>
 
-      <div className={styles.card__actions}>
+      <div className={styles.actions}>
         <button
-          className={styles.addButton + (selected ? ' ' + styles.addButtonSelected : '')}
+          className={`${styles.addButton} ${selected ? styles.addButtonSelected : ''} ${styles[theme]}`}
           onClick={onSelect}
         >
           {selected ? 'Удалить' : 'Добавить'}
         </button>
 
-        <div
-          className={styles.buttonWrapper}
-        >
-          <button
-            className={styles.offersButton}
-            onClick={() => {
-              if (isAuthenticated) {
-                setIsOffersVisible(true);
-                fetchOffers();
-              } else {
-                setIsVisible(true);
-                setOpenComponent('login');
-                setShowLoginMessage(true);
-              }
-            }}
-            disabled={isLoading}
-          >
-            Посмотреть предложения
-          </button>
 
-        </div>
+        <button
+          className={`${styles.offersButton} ${styles[theme]}`}
+          onClick={() => {
+            if (isAuthenticated) {
+              setIsOffersVisible(true);
+              fetchOffers();
+            } else {
+              setIsVisible(true);
+              setOpenComponent('login');
+              setShowLoginMessage(true);
+            }
+          }}
+          disabled={isLoading}
+        >
+          Посмотреть предложения
+        </button>
       </div>
 
       <Modal isOpen={isOffersVisible} onClose={() => setIsOffersVisible(false)}>

@@ -3,10 +3,12 @@ import styles from './SavedConfig.module.css';
 import SavedComponentCard from "../SaveComponentCard/SavedComponentCard";
 import { useAuth } from "../../AuthContext";
 import { useState } from "react";
+import { useConfig } from "../../ConfigContext";
 
 const SavedConfig = ({ configuration, onDelete }: { configuration: Configuration, onDelete?: () => void; }) => {
     const { isAuthenticated, getToken } = useAuth();
     const [componentPrices, setComponentPrices] = useState<{ [id: string]: number }>({});
+    const { theme } = useConfig()
 
     const handlePriceLoad = (componentId: string, price: number) => {
         setComponentPrices(prev => ({ ...prev, [componentId]: price }));
@@ -69,7 +71,7 @@ const SavedConfig = ({ configuration, onDelete }: { configuration: Configuration
                 </div>
             ))}
 
-            <div className={styles.footer}>
+            <div className={`${styles.footer} ${styles[theme]}`}>
                 <div className={styles.totalContainer}>
                     {Object.keys(componentPrices).length === configuration.components.length && (
                         <div className={styles.totalPrice}>

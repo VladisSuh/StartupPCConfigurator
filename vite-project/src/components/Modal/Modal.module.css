@@ -13,10 +13,10 @@
 }
 
 .modal {
-    background: #212124;
     padding: 30px;
     border-radius: 12px;
     position: relative;
+    background-color: var(--bg-primary);
 }
 
 .closeButton {
@@ -27,5 +27,12 @@
     background: none;
     border: none;
     cursor: pointer;
+}
+
+.closeButton.dark {
     color: white;
+}
+
+.closeButton.light {
+    color: rgb(49, 49, 49);
 }

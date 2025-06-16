@@ -8,14 +8,14 @@
     margin-top: 20px;
 }
 
+
 .tabs {
     display: flex;
-    gap: 13px;
-    margin-bottom: 10px;
+    gap: 12px;
+    /* margin-bottom: 10px; */
     flex-wrap: wrap;
-    padding: 15px 0;
-    width: fit-content; 
-    margin: 0 auto;
+    padding: 15px 15px 10px;
+    background-color: var(--bg-secondary);
 }
 
 .tab {
@@ -29,4 +29,29 @@
 
 .activeTab {
     color: var(--tab-active);
+}
+
+
+.usecaseTab {
+    background: transparent;
+    border-radius: 20px;
+    border: 1px solid #646cff;
+    color: var(--text-secondary);
+    cursor: pointer;
+    white-space: nowrap;
+    padding: 5px 10px;
+}
+
+.usecaseTab.dark {
+    box-shadow: 0px 0px 5px 0px rgba(140, 0, 255, 0.623);
+    border: 1px solid #3b44e7;
+}
+
+
+
+.activeUsecaseTab {
+    border-radius: 20px;
+    border: 1px solid #0077ff;
+    background-color: #3b44e7;
+    color: white;
 }

@@ -1,10 +1,13 @@
+import { useConfig } from "../../ConfigContext";
 import { Component, specs } from "../../types";
 import styles from "./ComponentDetails.module.css";
 
 
 const ComponentDetails = ({ component }: { component: Component }) => {
+    const { theme } = useConfig();
+    
     return (
-        <div className={styles.componentDetails}>
+        <div className={`${styles.componentDetails} ${styles[theme]}`} >
             <h2 className={styles.componentTitle}>{component.name}</h2>
 
             <div className={styles.componentMeta}>

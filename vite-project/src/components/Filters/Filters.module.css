@@ -1,0 +1,179 @@
+.filtersContainer{
+    margin: 10px 10px;
+}
+
+
+.searchContainer {
+    width: 100%;
+}
+
+.searchInput{
+    width: 100%;
+    padding: 7px 15px;
+    font-size: 16px;
+    border-radius: 4px;
+}
+
+.searchInput.dark {
+    /* border: 1px solid #ddd; */
+    background-color: #2e2e2e;
+    color: var(--text-secondary)
+}
+
+.searchInput.light {
+    background-color: #f0f0f5;
+    border: 1px solid #f0f0f5;
+}
+
+.searchInput:focus {
+    outline: none;
+    border-color: #646cff;
+    box-shadow: 0 0 10px 0 rgba(100, 108, 255, 0.2);
+}
+
+
+
+
+.tabs {
+    display: flex;
+    gap: 12px;
+    /* margin-bottom: 10px; */
+    flex-wrap: wrap;
+    padding: 15px 0 10px;
+}
+
+.brandTabs {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+    padding: 15px 0;
+
+}
+.controls {
+    margin: 10px 0;
+
+    display: flex;
+    justify-content: space-between;
+}
+
+
+.checkboxLabel input {
+    margin-right: 18px;
+}
+
+
+
+.tab {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    white-space: nowrap;
+    padding: 5px 10px;
+}
+
+.activeTab {
+    color: black;
+}
+
+.usecaseTab {
+    background: transparent;
+    border-radius: 20px;
+    border: 1px solid #646cff;
+    color: var(--text-secondary);
+    cursor: pointer;
+    white-space: nowrap;
+    padding: 5px 10px;
+}
+
+.usecaseTab.dark {
+    box-shadow: 0px 0px 5px 0px rgba(140, 0, 255, 0.623);
+    border: 1px solid #3b44e7;
+}
+
+.activeUsecaseTab {
+    border-radius: 20px;
+    border: 1px solid #0077ff;
+    background-color: #3b44e7;
+    color: white;
+}
+
+.brandTab {
+    background: transparent;
+    border-radius: 20px;
+    border: 1px solid var(--text-secondary);
+    color: var(--text-secondary);
+    cursor: pointer;
+    white-space: nowrap;
+    padding: 5px 10px;
+}
+
+.activeBrandTab.light {
+    border-radius: 20px;
+    border: 1px solid #000000;
+    background-color: #000000;
+    color: white;
+}
+
+.activeBrandTab.dark {
+    border-radius: 20px;
+    border: 1px solid var(--green);
+    color: var(--green);
+    box-shadow: 0px 0px 5px 0px #00ff7783;
+}
+
+.brandList {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.brand {
+    padding: 6px 12px;
+    border: 1px solid #ff6600;
+    background-color: transparent;
+    color: #ff6600;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: 0.2s;
+}
+
+.brand:hover {
+    background-color: #2b2b2b;
+}
+
+.activeBrand {
+    background-color: #ff6600;
+    color: #fff;
+}
+
+.select{
+    outline: none;
+}
+
+.select.light {
+    padding: 2px 6px;
+    border: 1px solid #ffffff;
+    background-color: white;
+    font-size: 14px;
+    border-bottom:1px solid #b1b1b1;
+}
+
+.select.dark {
+    padding: 2px 6px;
+    border: none;
+    background-color: var(--bg-secondary);
+    color: var(--text-secondary);
+    font-size: 14px;
+    border-bottom:1px solid #4b4b4b;
+}
+
+
+
+.label{
+    margin-right: 5px;
+}
+
+

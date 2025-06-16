@@ -1,10 +1,14 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { CategoryType, categories } from './types';
+import './App.css';
+
 
 interface ConfigContextType {
     getUsecases: () => string[];
     getBrands: (category: CategoryType) => string[];
     isLoading: boolean;
+    theme: string;
+    setTheme: (theme: string) => void;
 }
 
 const ConfigContext = createContext<ConfigContextType | undefined>(undefined);
@@ -19,14 +23,18 @@ export const useConfig = () => {
 
 export const ConfigProvider = ({ children }: { children: ReactNode }) => {
     const [usecases, setUsecases] = useState<string[]>([]);
+    const [theme, setTheme] = useState('dark')
+
     const [brands, setBrands] = useState<Record<CategoryType, string[]>>({
         cpu: [], gpu: [], motherboard: [], ram: [],
         hdd: [], ssd: [], cooler: [], case: [], psu: []
     });
     const [isLoading, setIsLoading] = useState(true);
+
     const getBrands = (category: CategoryType) => {
         return brands[category] || [];
     };
+
     const getUsecases = () => {
         return usecases;
     };
@@ -71,8 +79,12 @@ export const ConfigProvider = ({ children }: { children: ReactNode }) => {
     }, []);
 
     return (
-        <ConfigContext.Provider value={{ getUsecases, getBrands, isLoading }}>
-            {children}
+        <ConfigContext.Provider value={{ getUsecases, getBrands, isLoading, theme, setTheme }}>
+            <div className={`root ${theme}`}>
+                <div className="container">
+                    {children}
+                </div>
+            </div>
         </ConfigContext.Provider>
     );
 };

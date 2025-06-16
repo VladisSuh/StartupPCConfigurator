@@ -2,9 +2,11 @@ import { Configuration, UsecaseObject, UsecasesResponse } from "../../types";
 import styles from './UsecaseConfiguration.module.css';
 import SavedComponentCard from "../SaveComponentCard/SavedComponentCard";
 import { useState } from "react";
+import { useConfig } from "../../ConfigContext";
 
 const UsecaseConfiguration = ({ configuration }: { configuration: UsecaseObject }) => {
     const [componentPrices, setComponentPrices] = useState<{ [id: string]: number }>({});
+    const { theme } = useConfig()
 
     const handlePriceLoad = (componentId: string, price: number) => {
         setComponentPrices(prev => ({ ...prev, [componentId]: price }));
@@ -17,7 +19,7 @@ const UsecaseConfiguration = ({ configuration }: { configuration: UsecaseObject 
         <div className={styles.configuration}>
 
             <div className={styles.configHeader}>
-                <div className={styles.configTitle}>
+                <div className={`${styles.configTitle} ${styles[theme]}`}>
                     {configuration.name}
                 </div>
             </div>
@@ -32,7 +34,7 @@ const UsecaseConfiguration = ({ configuration }: { configuration: UsecaseObject 
                 </div>
             ))}
 
-            <div className={styles.footer}>
+            <div className={`${styles.footer} ${styles[theme]}`}>
                 <div className={styles.totalContainer}>
                     {Object.keys(componentPrices).length === configuration.components.length && (
                         <div className={styles.totalPrice}>

@@ -4,8 +4,10 @@
     padding: 20px;
 }
 
+
+
 .componentTitle {
-    color: #ffffff;
+    color: var(--text-primary);
     margin-bottom: 10px;
 }
 
@@ -13,13 +15,13 @@
     display: flex;
     justify-content: space-between;
     margin-bottom: 20px;
-    color: #ebebeb;
+    color: var(--text-secondary);
     font-size: 14px;
 }
 
 .componentSpecs h3 {
     margin-bottom: 15px;
-    color: #e7e7e7;
+    color: var(--text-primary);
     border-bottom: 1px solid #eee;
     padding-bottom: 5px;
 }
@@ -33,10 +35,10 @@
 }
 
 .specName {
-    color: #ffffff;
+    color: var(--text-primary);
 }
 
 .specValue {
     font-weight: bold;
-    color: #f1f1f1;
+    color: var(--text-primary);
 }

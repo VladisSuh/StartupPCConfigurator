@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
 import styles from './ComponentList.module.css';
 import { ComponentCard } from '../ComponentCard/ComponentCard';
-//import { mockComponents } from '../mockData/mock';
-import { Component, ComponentListProps, UsecaseLabels, Usecases } from '../../types/index';
-import { useConfig } from '../../ConfigContext';
+import { Component, ComponentListProps } from '../../types/index';
+import Filters from '../Filters/Filters';
 
 
 
@@ -12,36 +11,46 @@ const ComponentList = ({
     selectedComponents,
     setSelectedComponents,
 }: ComponentListProps) => {
+
     const [allComponents, setAllComponents] = useState<Component[]>([]);
     const [сompatibleComponents, setCompatibleComponents] = useState<Component[]>([]);
-    const [showCompatibleOnly, setShowCompatibleOnly] = useState(true);
-    const [isFiltersVisible, setIsFiltersVisible] = useState(false);
-    const [brands, setBrands] = useState<string[]>([]);
-    const { getBrands, isLoading, getUsecases } = useConfig()
+
     const [activeBrandTab, setActiveBrandTab] = useState<string>('Все бренды');
     const [activeUsecaseTab, setActiveUsecaseTab] = useState<string>('all');
+    const [showCompatibleOnly, setShowCompatibleOnly] = useState(true);
 
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
-    //const [searchQuery, setSearchQuery] = useState('');
+    const [componentPrices, setComponentPrices] = useState<Record<string, number>>({});
+
+    const [filteredCompatibleComponents, setFilteredCompatibleComponents] = useState<Component[]>([]);
+    const [filteredAllComponents, setFilteredAllComponents] = useState<Component[]>([]);
+    
+
+    const saveComponentPrice = (componentId: string, price: number) => {
+        setComponentPrices(prev => ({
+            ...prev,
+            [componentId]: price
+        }));
+    };
+
+    useEffect(() => {
+        setActiveBrandTab('Все бренды');
+        setActiveUsecaseTab('all');
+    }, [selectedCategory]);
+
 
     useEffect(() => {
         const fetchComponents = async () => {
             try {
-                //setLoading(true);
                 setError('');
+                console.log('Fetching components for category:', selectedCategory);
 
                 const compatible = await fetchCompatibleComponents(selectedCategory, selectedComponents, activeUsecaseTab, activeBrandTab);
                 setCompatibleComponents(compatible)
 
                 const all = await fetchAllComponents(selectedCategory, activeUsecaseTab, activeBrandTab);
                 setAllComponents(all);
-
-                const brandsWithAll = ['Все бренды', ...getBrands(selectedCategory)];
-                setBrands(brandsWithAll);
-
-                console.log('Brands:', brandsWithAll);
-
             } catch (err) {
                 setError(err instanceof Error ? err.message : 'Неизвестная ошибка');
             } finally {
@@ -56,47 +65,27 @@ const ComponentList = ({
 
     return (
         <div className={styles.container}>
-            {<div className={styles.tabs}>
-                {Usecases.map(usecase => (
-                    <button
-                        key={usecase}
-                        className={`${styles.tab} ${usecase === activeUsecaseTab ? styles.activeTab : ''}`}
-                        onClick={() => setActiveUsecaseTab(usecase)}
-                    >
-                        {UsecaseLabels[usecase] || usecase}
-                    </button>
-                ))}
-            </div>}
-
-            {<div className={styles.brandTabs}>
-                {brands.map(brand => (
-                    <button
-                        key={brand}
-                        className={`${styles.tab} ${brand === activeBrandTab ? styles.activeTab : ''}`}
-                        onClick={() => setActiveBrandTab(brand)}
-                    >
-                        {brand}
-                    </button>
-                ))}
-            </div>}
-
-            <div className={styles.controls}>
-                <label className={styles.checkboxLabel}>
-                    <input
-                        type="checkbox"
-                        checked={showCompatibleOnly}
-                        onChange={() => setShowCompatibleOnly(!showCompatibleOnly)}
-                    />
-                    Совместимые товары
-                </label>
-            </div>
+            <Filters
+                сompatibleComponents={сompatibleComponents}
+                allComponents={allComponents}
+                setFilteredCompatibleComponents={setFilteredCompatibleComponents}
+                setFilteredAllComponents={setFilteredAllComponents}
+                componentPrices={componentPrices}
+                activeBrandTab={activeBrandTab}
+                setActiveBrandTab={setActiveBrandTab}
+                activeUsecaseTab={activeUsecaseTab}
+                setActiveUsecaseTab={setActiveUsecaseTab}
+                selectedCategory={selectedCategory}
+                showCompatibleOnly={showCompatibleOnly}
+                setShowCompatibleOnly={setShowCompatibleOnly}
+            />
 
             <div >
                 {loading ? (
                     <div className={styles.loading}>Загрузка...</div>
                 ) : (
                     <div>
-                        {(showCompatibleOnly ? сompatibleComponents || [] : allComponents || []).map((component) => (
+                        {(showCompatibleOnly ? filteredCompatibleComponents : filteredAllComponents || []).map((component) => (
                             <ComponentCard
                                 key={component.id}
                                 component={component}
@@ -109,6 +98,7 @@ const ComponentList = ({
                                         };
                                     })
                                 }
+                                onPriceLoaded={(price) => saveComponentPrice(component.id, price)}
                                 selected={selectedComponents[component.category]?.id === component.id}
                             />
                         ))}
@@ -155,7 +145,7 @@ const fetchAllComponents = async (
     }
 
     const data = await response.json();
-    console.log('Response fetchAllComponents:', data); // Debugging line
+    console.log('Response fetchAllComponents:', data);
 
     return data;
 };

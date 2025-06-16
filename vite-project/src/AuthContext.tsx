@@ -17,6 +17,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const login = useCallback((token: string) => {
         localStorage.setItem('authToken', token);
+        console.log('Login successful. Token stored.', token);
         setIsAuthenticated(true);
         console.log('Login successful. Token stored.');
     }, []);

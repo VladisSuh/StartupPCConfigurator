@@ -31,7 +31,7 @@
 }
 
 .footer {
-    border-top: 1px solid rgba(255, 255, 255, .2);
+    border-top: 1px solid rgba(97, 61, 61, 0.2);
     display: flex;
     justify-content: flex-end;
     align-items: flex-end;
@@ -39,7 +39,14 @@
     font-size: 16px;
     border-bottom-left-radius: 10px;
     border-bottom-right-radius: 10px;
+}
+
+.footer.dark {
     background-color: var(--bg-tertiary);
+}
+
+.footer.light {
+    background-color:  rgb(197, 197, 197);
 }
 
 .totalContainer {

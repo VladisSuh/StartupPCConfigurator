@@ -4,6 +4,7 @@ import { Configurations, UsecaseLabels, UsecaseObject, Usecases, UsecasesRespons
 import styles from './UsecasesPage.module.css';
 import SavedConfig from "../SavedConfig/SavedConfig";
 import UsecaseConfiguration from "../UsecaseConfiguration/UsecaseConfiguration";
+import { useConfig } from "../../ConfigContext";
 
 
 const UsecasesPage = () => {
@@ -12,7 +13,7 @@ const UsecasesPage = () => {
     const [UserConfigs, setUserConfigs] = useState<Configurations>([]);
     const [activeUsecaseTab, setActiveUsecaseTab] = useState<string>('office');
     const [UsecaseList, setUsecaseList] = useState<UsecaseObject[]>([]);
-
+    const {theme } = useConfig()
 
 
     useEffect(() => {
@@ -53,15 +54,19 @@ const UsecasesPage = () => {
             {<div className={styles.tabs}>
                 {Usecases.map(usecase => {
                     if (usecase === 'all') return null;
-                    return (<button
-                        key={usecase}
-                        className={`${styles.tab} ${usecase === activeUsecaseTab ? styles.activeTab : ''}`}
-                        onClick={() => setActiveUsecaseTab(usecase)}
-                    >
-                        {UsecaseLabels[usecase] || usecase}
-                    </button>)
+                    return (
+                        <button
+                            key={usecase}
+                            className={`${styles.usecaseTab} ${usecase === activeUsecaseTab ? styles.activeUsecaseTab : ''} ${styles[theme]}`}
+                            onClick={() => setActiveUsecaseTab(usecase)}
+                        >
+                            {UsecaseLabels[usecase] || usecase}
+                        </button>
+                    );
                 })}
             </div>}
+
+
 
             <div className={styles.content}>
                 {loading ? (

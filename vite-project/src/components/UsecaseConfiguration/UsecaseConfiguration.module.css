@@ -2,6 +2,7 @@
     background-color: var(--bg-secondary);
     margin-bottom: 30px;
     border-radius: 10px;
+    box-shadow: 0px 0px 24px -4px rgba(53, 53, 53, 0.192);
 }
 
 .configHeader{
@@ -18,9 +19,13 @@
     font-size: 16px;
 }
 
+.configTitle.light{
+    font-weight: 700;
+}
+
 
 .footer {
-    border-top: 1px solid rgba(255, 255, 255, .2);
+    
     display: flex;
     justify-content: flex-end;
     align-items: flex-end;
@@ -28,7 +33,16 @@
     font-size: 16px;
     border-bottom-left-radius: 10px;
     border-bottom-right-radius: 10px;
+}
+
+.footer.dark {
+    border-top: 1px solid rgba(97, 61, 61, 0.2);
     background-color: var(--bg-tertiary);
+}
+
+.footer.light {
+    background-color:  rgb(255, 255, 255);
+    border-top: 1px solid rgba(77, 77, 77, 0.329);
 }
 
 .totalContainer {
