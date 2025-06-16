@@ -1,28 +1,31 @@
 .list {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 20px;
+    
 }
 
 .item {
     display: flex;
     align-items: center;
     justify-content: space-between; 
-    padding: 8px 12px;
     border-radius: 8px;
 }
 
-.text {
-    flex-grow: 1;
+.category{
+    color: var(--text-secondary);
+    margin: 0;
+}
+
+.name {
     font-size: 16px;
+    margin: 0;
 }
 
 .removeButton {
     background: none;
     border: none;
-    color: rgb(141, 141, 141);
-    font-weight: bold;
+    color: var(--text-secondary);
     cursor: pointer;
     font-size: 25px;
-    margin-left: 16px;
 }

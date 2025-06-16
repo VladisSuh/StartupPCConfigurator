@@ -1,13 +1,12 @@
-/* CategoryTabs.module.css */
 .tabsContainer {
     display: flex;
-    flex-direction: column;
     margin-right: 25px;
-    /* width: 300px; */
-    text-align: left;
-    font-size: 14px;
-    color: var(--text-primary);
-    width: 250px;
+    width: 260px;
+    height: fit-content;
+}
+
+.tabsContent.light{
+    background-color: white;
 }
 
 .tab {
@@ -15,17 +14,30 @@
     width: 100%;
     min-height: 70px;
     padding: 10px 15px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgb(209, 209, 209);
+    border-right: 1px solid rgb(209, 209, 209);
     cursor: pointer;
     display: flex;
     align-items: center;
     will-change: auto;
-    background: transparent;
-    color: rgb(158, 158, 158)
+    color: var(--text-secondary);
+    font-weight: 600;
 }
 
-/* Активный таб с градиентным фоном и псевдоэлементом */
-.tabActive {
+.tab.light {
+    border-bottom: 1px solid rgb(209, 209, 209);
+    border-right: 1px solid rgb(209, 209, 209);
+}
+
+.tab.dark {
+    border-bottom: 1px solid rgb(53, 53, 53);
+    border-right: 1px solid rgb(53, 53, 53);
+}
+
+
+
+
+.tabActive.dark {
     position: relative; 
     background: linear-gradient(114.13deg, #00fff200 40.14%,#00fff218 60.14%, var(--green) 134.41%);
     border-left: none; 
@@ -36,30 +48,87 @@
     color: var(--text-primary);
 }
 
+.tabActive.light {
+    position: relative; 
+    background: linear-gradient(114.13deg, #0077ff00 40.14%,#0077ff11 68.14%, #0077ff9a 134.41%);
+    border-left: none; 
+    transition: background font-weight 0.5s ease;
+    color: var(--text-primary);
+}
 
-.tab::before {
+
+.tab.dark::before {
     content: '';
     position: absolute;
     left: 0;
     top: 0;
-    width: 4px;
+    width: 5px;
     height: 100%;
-    /* background-color: rgba(0, 251, 255, 0.849); */
     background-color: var(--green);
     opacity: 0;
     transform: scaleY(0.95);
     transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
-.tabActive::before {
+
+
+.tab.light::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 5px;
+    height: 100%;
+    background-color: #000000;
+    opacity: 0;
+    transform: scaleY(0.95);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.tab.light::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 5px;
+    height: 100%;
+    background-color: #000000;
+    opacity: 0;
+    transform: scaleY(0.95);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.tabWithComponent.light::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 5px;
+    height: 100%;
+    background-color: #afafaf;
+    opacity: 0;
+    transform: scaleY(0.95);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.tabActive.light::before,
+.tabActive.dark::before,
+.tabWithComponent.light::before {
     opacity: 1;
     transform: scaleY(1);
 }
 
-/* Состояние таба с компонентом */
-.tabWithComponent {
+.tabWithComponent.dark {
     /* background: linear-gradient(114.13deg, #00fff200 40.14%,#00fff20c 60.14%, #00fff233 124.41%); */
     background: linear-gradient(114.13deg, #00fff200 40.14%,#00fff20c 60.14%, var(--green-not-active) 124.41%);
     border-color: transparent;
     border: 1px solid #2dce982a;
+}
+
+.tabWithComponent.light {
+    /* background: linear-gradient(114.13deg, #00fff200 40.14%,#00fff20c 60.14%, #00fff233 124.41%); */
+    /* background: linear-gradient(114.13deg, #2a455f00 40.14%,#63636310 68.14%, #66666650 134.41%); */
+    border-color: transparent;
+    border-bottom: 1px solid #2d3c4d2a;
+    border-right: 1px solid #2d3c4d2a;
 }

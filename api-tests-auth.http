@@ -315,3 +315,8 @@ GET http://localhost:8080/notifications?
     page=1&
     pageSize=10
 Authorization: Bearer {{access_token}}
+
+###Проверка подписки
+GET http://localhost:8080/subscriptions/status?
+    ids=1,2,3,4,5,6,7,8
+Authorization: Bearer {{access_token}}

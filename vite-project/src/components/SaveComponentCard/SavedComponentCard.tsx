@@ -6,6 +6,9 @@ import styles from './SavedComponentCard.module.css';
 import PriceOffer from '../PriceOffer/PriceOffer';
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../AuthContext';
+import { useConfig } from '../../ConfigContext';
+import Register from '../Register/component';
+import Login from '../Login/component';
 
 const SavedComponentCard = ({ component, onPriceLoad }:
     { component: Component, onPriceLoad?: (componentId: string, price: number) => void }) => {
@@ -16,6 +19,10 @@ const SavedComponentCard = ({ component, onPriceLoad }:
     const [offers, setOffers] = useState<any[]>([]);
     const [isOffersVisible, setIsOffersVisible] = useState(false);
     const [isDetailsVisible, setIsDetailsVisible] = useState(false);
+    const [openComponent, setOpenComponent] = useState('login');
+    const [showLoginMessage, setShowLoginMessage] = useState(false);
+    const [isVisible, setIsVisible] = useState(false);
+    const { theme } = useConfig()
 
     console.log('SavedComponentCard:', component);
 
@@ -129,7 +136,7 @@ const SavedComponentCard = ({ component, onPriceLoad }:
     };
 
     return (
-        <div className={styles.card}>
+        <div className={`${styles.card} ${styles[theme]}`}>
             <div className={styles.card__info}>
                 <div className={styles.componentType}>
                     {categoryLabels[component.category]}
@@ -149,17 +156,21 @@ const SavedComponentCard = ({ component, onPriceLoad }:
                 </div>
             </div>
 
-
-
             <div className={styles.card__actions}>
                 <div
                     className={styles.buttonWrapper}
                 >
                     <button
-                        className={styles.offersButton}
+                        className={`${styles.offersButton} ${styles[theme]}`}
                         onClick={() => {
-                            setIsOffersVisible(true);
-                            fetchOffers();
+                            if (isAuthenticated) {
+                                setIsOffersVisible(true);
+                                fetchOffers();
+                            } else {
+                                setIsVisible(true);
+                                setOpenComponent('login');
+                                setShowLoginMessage(true);
+                            }
                         }}
                         disabled={isLoading}
                     >
@@ -181,7 +192,23 @@ const SavedComponentCard = ({ component, onPriceLoad }:
                     )}
                 </div>
 
-                <img src='src/assets/bell-icon.png' onClick={subscribeToComponent} className={styles.notificationIcon} alt='подписка на уведомления' title='Подписаться на уведомления' />
+                <div onClick={subscribeToComponent}>
+                    {theme === 'dark' ? (
+                        <img
+                            className={styles.notificationIcon}
+                            src="src/assets/notifications-active-light.svg"
+                            alt="Подписка на уведомления"
+                        />
+                    ) : (
+                        <img
+                            className={styles.notificationIcon}
+                            src="src/assets/notifications-active-dark.svg"
+                            alt="Подписка на уведомления"
+                        />
+                    )}
+                </div>
+
+
             </div>
 
             <Modal isOpen={isOffersVisible} onClose={() => setIsOffersVisible(false)}>
@@ -200,9 +227,30 @@ const SavedComponentCard = ({ component, onPriceLoad }:
                 </div>
             </Modal>
 
-            {/* <Modal isOpen={isDetailsVisible} onClose={() => setIsDetailsVisible(false)}>
+            <Modal isOpen={isVisible} onClose={() => setIsVisible(false)}>
+                {openComponent === 'register' ? (
+                    <Register
+                        setOpenComponent={(component) => {
+                            setOpenComponent(component);
+                            setShowLoginMessage(false);
+                        }}
+                        onClose={() => setIsVisible(false)}
+                    />
+                ) : (
+                    <Login
+                        setOpenComponent={(component) => {
+                            setOpenComponent(component);
+                            setShowLoginMessage(false);
+                        }}
+                        onClose={() => setIsVisible(false)}
+                        message={showLoginMessage ? 'Посмотреть предложения можно после авторизации' : undefined}
+                    />
+                )}
+            </Modal>
+
+            <Modal isOpen={isDetailsVisible} onClose={() => setIsDetailsVisible(false)}>
                 <ComponentDetails component={component} />
-            </Modal> */} {/* не возвращается бренд с бека */}
+            </Modal> {/* не возвращается бренд с бека */}
         </div>
     );
 }

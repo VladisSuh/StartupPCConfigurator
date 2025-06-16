@@ -89,16 +89,12 @@
     color: inherit;
     cursor: pointer;
     text-decoration: none;
+    font-size: 16px ;
+    font-weight: 600;
 }
 
-.navButton:hover {
-    text-decoration: underline;
-}
 
-.active {
-    font-weight: bold;
-    color: var(--tab-active);
-}
+
 
 .navigation {
     gap: 30px;
@@ -109,7 +105,6 @@
     position: relative;
     display: flex;
     flex-direction: row;
-    margin-right: 40px;
 }
 
 .notificationDot {
@@ -174,4 +169,18 @@
     justify-content: center;
     align-items: center;
     z-index: 1000;
+}
+
+
+.notificationContent {
+    margin: 0;
+}
+
+.eee {
+    color: red
+}
+
+.iconContainer{
+    display: flex;
+    gap: 20px;
 }

@@ -95,6 +95,9 @@ func main() {
 		subs.POST("", proxyKeepPath(notifURL))
 		// GET  /subscriptions
 		subs.GET("", proxyKeepPath(notifURL))
+
+		subs.GET("/status", proxyKeepPath(notifURL))
+
 		// DELETE /subscriptions/:componentId
 		subs.DELETE("/:componentId", proxyKeepPath(notifURL))
 	}

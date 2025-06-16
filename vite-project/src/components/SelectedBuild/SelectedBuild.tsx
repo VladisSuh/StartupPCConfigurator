@@ -1,16 +1,14 @@
 import { useState } from 'react';
 import { useAuth } from '../../AuthContext';
-import { Component } from '../../types';
+import { CategoryType, Component, SelectedBuildProps } from '../../types';
 import Login from '../Login/component';
 import { Modal } from '../Modal/Modal';
 import Register from '../Register/component';
 import SelectedComponentList from '../SelectedComponentList/SelectedComponentList';
 import styles from './SelectedBuild.module.css';
+import { useConfig } from '../../ConfigContext';
 
-interface SelectedBuildProps {
-    selectedComponents: Record<string, Component | null>;
-    setSelectedComponents: React.Dispatch<React.SetStateAction<Record<string, Component | null>>>;
-}
+
 
 export const SelectedBuild = ({ selectedComponents, setSelectedComponents }: SelectedBuildProps) => {
 
@@ -21,13 +19,16 @@ export const SelectedBuild = ({ selectedComponents, setSelectedComponents }: Sel
     const [isSaveResponseVisible, setIsSaveResponseVisible] = useState(false);
     const [isSaveError, setIsSaveError] = useState(false);
     const [ErrorMessage, setErrorMessage] = useState('');
+    const [NameInputVisible, setNameInputVisible] = useState(false);
+    const [buildName, setBuildName] = useState('');
+    const { theme } = useConfig();
 
 
     const selectedList = Object.entries(selectedComponents).filter(
         ([_, component]) => component !== null
-    ) as [string, Component][];
+    ) as [CategoryType, Component][];
 
-    const handleRemove = (category: string) => {
+    const handleRemove = (category: CategoryType) => {
         setSelectedComponents((prev) => ({
             ...prev,
             [category]: null,
@@ -35,15 +36,9 @@ export const SelectedBuild = ({ selectedComponents, setSelectedComponents }: Sel
     };
 
     const handleSave = async () => {
-        if (!isAuthenticated) {
-            setIsVisible(true);
-            setOpenComponent('login');
-            setShowLoginMessage(true);
-        }
         const token = getToken();
 
-        const configName = prompt('Введите название конфигурации:');
-        if (!configName) return;
+        if (!buildName) return;
 
         const components = selectedList.map(([category, component]) => ({
             category,
@@ -57,7 +52,7 @@ export const SelectedBuild = ({ selectedComponents, setSelectedComponents }: Sel
                 'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify({
-                name: configName,
+                name: buildName,
                 components,
             }),
         })
@@ -70,7 +65,7 @@ export const SelectedBuild = ({ selectedComponents, setSelectedComponents }: Sel
                     'Authorization': `Bearer ${token}`
                 },
                 body: JSON.stringify({
-                    name: configName,
+                    name: buildName,
                     components,
                 }),
             });
@@ -84,32 +79,36 @@ export const SelectedBuild = ({ selectedComponents, setSelectedComponents }: Sel
                     setErrorMessage(str);
                 }
                 console.error('Тело ответа:', await response.text());
-                //alert(`Ошибка: ${responseJson.message || 'Неизвестная ошибка'}`);
                 return;
             }
 
             console.log('Конфигурация сохранена:', responseJson);
-            //alert('Конфигурация успешно сохранена!');
         } catch (error) {
             setIsSaveError(true);
             console.error(error);
-            //alert('Не удалось сохранить конфигурацию');
         }
         setIsSaveResponseVisible(true);
     };
 
     return (
-        <div className={styles.buildContainer}>
+        <div className={styles.selectedBuildContainer}>
             <div className={styles.summary}>
-                <h2 className={styles.title}>Итоговая сборка</h2>
+                <p className={styles.title}>Итоговая сборка</p>
                 {selectedList.length === 0 ? (
                     <p className={styles.empty}>Компоненты не выбраны</p>
                 ) : (
                     <SelectedComponentList selectedComponents={selectedList} onRemove={handleRemove} />
                 )}
             </div>
-
-            <div className={styles.button} onClick={handleSave}>
+            <div className={`${styles.saveButton} ${styles[theme]}`} onClick={() => {
+                if (!isAuthenticated) {
+                    setIsVisible(true);
+                    setOpenComponent('login');
+                    setShowLoginMessage(true);
+                }else{
+                    setNameInputVisible(true);
+                }
+            }}>
                 Сохранить в личном кабинете
             </div>
 
@@ -134,7 +133,30 @@ export const SelectedBuild = ({ selectedComponents, setSelectedComponents }: Sel
                 )}
             </Modal>
 
-            <Modal isOpen={isSaveResponseVisible} onClose={() => setIsSaveResponseVisible(false)}>
+            <Modal isOpen={NameInputVisible} onClose={() => {
+                setNameInputVisible(false);
+            }}>
+                <h3>Название вашей сборки</h3>
+                <input
+                    type="text"
+                    value={buildName}
+                    onChange={(e) => setBuildName(e.target.value)}
+                    placeholder="Например: 'Игровой ПК'"
+                    className={`${styles.input} ${styles[theme]}`}
+                    autoFocus
+                />
+                <button className={styles.submitButton} disabled={buildName === ''} onClick={() => {
+                    setNameInputVisible(false);
+                    handleSave();
+                    setBuildName('');
+                }}>Сохранить</button>
+            </Modal>
+
+            <Modal isOpen={isSaveResponseVisible} onClose={() => {
+                setIsSaveResponseVisible(false)
+                setIsSaveError(false);
+                setErrorMessage('');
+            }}>
                 {isSaveError ? (
                     <>
                         <h3>Произошла ошибка при сохранении конфигурации.</h3>
