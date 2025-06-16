@@ -3,9 +3,13 @@ import styles from "./styles.module.css";
 import classNames from "classnames";
 import { useState } from "react";
 
-import iconOpenEye from '../../assets/icon-open-eye.png'
-import iconClosedEye from '../../assets/icon-closed-eye.png'
+import eyeOpenDark from '../../assets/eye-open-dark.svg'
+import eyeOpenLight from '../../assets/eye-open-light.svg'
+import eyeClosedDark from '../../assets/eye-closed-dark.svg'
+import eyeClosedLight from '../../assets/eye-closed-light.svg'
+
 import { useAuth } from "../../AuthContext";
+import { useConfig } from "../../ConfigContext";
 
 type LoginData = {
     email: string
@@ -37,6 +41,7 @@ export default function Login({ setOpenComponent, onClose, message }:
     const [loading, setLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
+    const { theme } = useConfig();
 
     const { login } = useAuth();
 
@@ -92,13 +97,13 @@ export default function Login({ setOpenComponent, onClose, message }:
 
     return (
         <form onSubmit={handleSubmit(onSubmit)} className={classNames(styles.form)}>
-            {message && <div className={styles.message}>{message}</div>}
+            {message && <div className={`${styles.message} ${styles[theme]}`}>{message}</div>}
 
             <h2 className={styles.formLabel}>Авторизация</h2>
 
-
             <label>Email</label>
             <input
+                className={`${styles.input} ${styles[theme]} ${errors.email ? styles.errorInput : ''}`}
                 {...register("email", {
                     required: "Email обязателен",
                     pattern: {
@@ -107,14 +112,12 @@ export default function Login({ setOpenComponent, onClose, message }:
                     }
                 })}
                 onBlur={() => handleBlur("email")}
-                className={errors.email ? styles.errorInput : ''}
             />
             {errors.email && (
-                <p role="alert" className={styles.errorMessage}>
+                <p role="alert" className={`${styles.errorMessage} ${styles[theme]}`}>
                     {errors.email.message}
                 </p>
             )}
-
 
             <label>Пароль</label>
             <div className={styles.passwordInputContainer}>
@@ -124,26 +127,32 @@ export default function Login({ setOpenComponent, onClose, message }:
                         required: "Пароль обязателен",
                     })}
                     onBlur={() => handleBlur("password")}
-                    className={`${styles.passwordInput} ${errors.password ? styles.errorInput : ''}`}
+                    className={`${styles.input} ${styles.passwordInput} ${styles[theme]} ${errors.email ? styles.errorInput : ''}`}
                 />
                 <button
                     type="button"
                     className={styles.showPasswordButton}
                     onClick={() => setShowPassword(prev => !prev)}
                 >
-                    <img
-                        src={showPassword ? iconClosedEye : iconOpenEye}
-                        alt={showPassword ? "Скрыть пароль" : "Показать пароль"}
-                        className={styles.eyeIcon}
-                    />
+                    {theme === 'dark' ? (
+                        <img
+                            className={`${styles.eyeIcon}`}
+                            src={showPassword ? eyeClosedLight : eyeOpenLight}
+                        />
+                    ) : (
+                        <img
+                            className={`${styles.eyeIcon}`}
+                            src={showPassword ? eyeClosedDark : eyeOpenDark}
+                        />
+                    )}
                 </button>
             </div>
+
             {errors.password && (
-                <p role="alert" className={styles.errorMessage}>
+                <p role="alert" className={`${styles.errorMessage} ${styles[theme]}`}>
                     {errors.password.message}
                 </p>
             )}
-
 
             <button
                 type="submit"

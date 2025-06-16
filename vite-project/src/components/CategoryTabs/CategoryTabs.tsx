@@ -1,14 +1,13 @@
 import { useState } from "react";
 import styles from './CategoryTabs.module.css';
 import { CategoryTabsProps, CategoryType, categories, categoryLabels } from "../../types/index";
-
-
-
+import { useConfig } from "../../ConfigContext";
 
 const CategoryTabs = ({ onSelect, selectedComponents }: CategoryTabsProps) => {
     const [activeCategory, setActiveCategory] = useState<CategoryType>("cpu");
+    const { theme } = useConfig()
 
-    const handleTabClick = (category: CategoryType) => {
+    const handleTabSelect = (category: CategoryType) => {
         setActiveCategory(category);
         onSelect(category);
     };
@@ -20,17 +19,18 @@ const CategoryTabs = ({ onSelect, selectedComponents }: CategoryTabsProps) => {
         return [
             styles.tab,
             isActive ? styles.tabActive : '',
-            !isActive && hasComponent ? styles.tabWithComponent : ''
+            !isActive && hasComponent ? styles.tabWithComponent : '',
+            styles[theme],
         ].join(' ').trim();
     };
 
     return (
         <div className={styles.tabsContainer}>
-            <div>
+            <div className={`${styles.tabsContent} ${styles[theme]}`}>
                 {categories.map((category) => (
                     <div
                         key={category}
-                        onClick={() => handleTabClick(category)}
+                        onClick={() => handleTabSelect(category)}
                         className={getTabClass(category)}
                     >
                         <span className={styles.categoryLabel}>

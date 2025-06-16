@@ -96,6 +96,17 @@ export const specs: Record<string, string> = {
     power_draw: "Потребляемая мощность",
     form_factor: "Форм-фактор",
     ram_type: "Тип ОЗУ",
+    height_mm: "Высота (мм)",
+    max_throughput: 'Максимальная скорость',
+    capacity_gb: 'Ёмкость (ГБ)',
+    voltage: "Напряжение (В)",
+    modules: 'Количество модулей',
+    max_memory_gb: "Максимальная оперативная память (ГБ)",
+    pcie_version: "Версия PCIe",
+    sata_ports: "Количество SATA портов",
+    memory_slots: "Количество слотов оперативной памяти",
+    m2_slots: "Количество M.2 слотов",
+    interface: "Интерфейс",
     capacity: "Ёмкость",
     frequency: "Частота",
     cooler_max_height: "Максимальная высота кулера",
@@ -115,6 +126,7 @@ export interface ComponentListProps {
 export interface ComponentCardProps {
     component: Component;
     onSelect: () => void;
+    onPriceLoaded: (price: number) => void;
     selected: boolean;
 }
 
@@ -203,9 +215,22 @@ export const UsecaseLabels: Record<UsecaseType, string> = {
 
 export type Notification = {
     id: string;
-    userId: string;
-    title: string;
+    componentCategory: string;
+    componentName: string;
     message: string;
     isRead: boolean;
-    createdAt: string; 
+    createdAt: string;
+    oldPrice: number;
+    newPrice: number;
+}
+
+
+export type SelectedBuildProps = {
+    selectedComponents: Record<string, Component | null>;
+    setSelectedComponents: React.Dispatch<React.SetStateAction<Record<string, Component | null>>>;
+}
+
+export type SelectedComponentListProps = {
+    selectedComponents: [CategoryType, Component][];
+    onRemove: (category: CategoryType) => void;
 }
