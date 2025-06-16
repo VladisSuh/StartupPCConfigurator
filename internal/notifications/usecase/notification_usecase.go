@@ -28,6 +28,9 @@ type NotificationUseCase interface {
 	Subscribe(ctx context.Context, userID uuid.UUID, componentID string) error
 
 	Unsubscribe(ctx context.Context, userID uuid.UUID, componentID string) error
+
+	CheckSubscribed(ctx context.Context,
+		userID uuid.UUID, ids []string) (map[string]bool, error)
 }
 
 // notificationUseCase реализует NotificationUseCase
@@ -119,4 +122,10 @@ func (uc *notificationUseCase) Subscribe(ctx context.Context, userID uuid.UUID, 
 }
 func (uc *notificationUseCase) Unsubscribe(ctx context.Context, userID uuid.UUID, componentID string) error {
 	return uc.repo.Unsubscribe(ctx, userID, componentID)
+}
+
+func (uc *notificationUseCase) CheckSubscribed(
+	ctx context.Context, userID uuid.UUID, ids []string,
+) (map[string]bool, error) {
+	return uc.repo.SubscribedMap(ctx, userID, ids)
 }

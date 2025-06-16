@@ -520,6 +520,28 @@ paths:
           description: Не авторизован
         '404':
           description: Подписка не найдена
+  /subscriptions/status:
+    get:
+      tags: [ Subscriptions ]
+      summary: Проверить список компонент на подписку
+      security: [ BearerAuth: [ ] ]
+      parameters:
+        - in: query
+          name: ids
+          schema:
+            type: string
+            example: "1,2,3"
+          required: true
+          description: Список componentId через запятую (≤ 200)
+      responses:
+        '200':
+          description: Map id → subscribed
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: boolean
 components:
   schemas:
     RegisterRequest:

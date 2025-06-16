@@ -126,6 +126,7 @@ func main() {
 	{
 		subs.POST("", notifHandler.Subscribe)
 		subs.DELETE("/:componentId", notifHandler.Unsubscribe)
+		handlers.NewSubHandler(subs, notifUC)
 	}
 
 	logger.Printf("Notifications service listening on :%s", httpPort)

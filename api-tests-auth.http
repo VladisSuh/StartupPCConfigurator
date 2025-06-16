@@ -32,7 +32,7 @@ Content-Type: application/json
 #       "expires_at":   "..."
 #   }
 ################################################################################
-@access_token  = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImZvcm1haWx2bGFkaXNAZ21haWwuY29tIiwiZXhwIjoxNzQ5MTkxNDI0LCJ1c2VyX2lkIjoiODcwZThkOTAtMmUzYy00NzlmLWIzMWEtMzhmYmRiZjhlMmZiIn0.tUOlj9Xcyx7zCUoRw3m4xs13k4sISYfYLJgATiC1onM
+@access_token  = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImZvcm1haWx2bGFkaXNAZ21haWwuY29tIiwiZXhwIjoxNzUwMTUyMDA3LCJ1c2VyX2lkIjoiMjU2YjVhNGEtZWIwZS00NzlhLTk2OTYtNTVlMDM5ZGUwZjk1In0.VFdOdKk4ueCj6Bkx2ANsrCYZuv758qro1jqIDPsopDs
 @refresh_token = 2
 
 ################################################################################
@@ -370,4 +370,9 @@ Authorization: Bearer {{access_token}}
 GET http://localhost:8080/notifications?
     page=1&
     pageSize=10
+Authorization: Bearer {{access_token}}
+
+###Проверка подписки
+GET http://localhost:8080/subscriptions/status?
+    ids=1,2,3,4,5,6,7,8
 Authorization: Bearer {{access_token}}

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"StartupPCConfigurator/internal/domain"
 	"github.com/go-redis/redis/v8"
@@ -19,6 +20,9 @@ type NotificationRepository interface {
 	MarkAsRead(ctx context.Context, userID, notifID uuid.UUID) error
 	Subscribe(ctx context.Context, userID uuid.UUID, componentID string) error
 	Unsubscribe(ctx context.Context, userID uuid.UUID, componentID string) error
+	SubscribedMap(ctx context.Context,
+		userID uuid.UUID,
+		ids []string) (map[string]bool, error)
 }
 
 // repoImpl implements NotificationRepository using PostgreSQL
@@ -163,6 +167,47 @@ func (r *repoImpl) Unsubscribe(ctx context.Context, userID uuid.UUID, componentI
 		userID, componentID,
 	)
 	return err
+}
+
+func (r *repoImpl) SubscribedMap(
+	ctx context.Context, userID uuid.UUID, ids []string,
+) (map[string]bool, error) {
+
+	// 1. Если список пуст – сразу вернуть пустой map
+	if len(ids) == 0 {
+		return map[string]bool{}, nil
+	}
+
+	// 2. pg-array из []string → {"id1","id2"}
+	//    pq.Array() не пригодится: нужен text[]
+	arrayStr := "{" + strings.Join(ids, ",") + "}"
+
+	const q = `
+        SELECT component_id
+        FROM   subscriptions
+        WHERE  user_id = $1
+          AND  component_id = ANY($2::text[])
+    `
+	rows, err := r.db.QueryContext(ctx, q, userID, arrayStr)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	// 3. default=false для всех; true - для найденных
+	res := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		res[id] = false
+	}
+
+	for rows.Next() {
+		var cID string
+		if err := rows.Scan(&cID); err != nil {
+			return nil, err
+		}
+		res[cID] = true
+	}
+	return res, rows.Err()
 }
 
 // NotificationCache defines Redis operations for unread counts
