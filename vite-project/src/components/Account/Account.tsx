@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { useAuth } from "../../AuthContext";
 import { Configurations } from "../../types";
 import styles from './Account.module.css';
-import SavedComponentCard from "../SaveComponentCard/SavedComponentCard";
 import SavedConfig from "../SavedConfig/SavedConfig";
 
 

@@ -9,6 +9,7 @@ import { useAuth } from '../../AuthContext';
 import { useConfig } from '../../ConfigContext';
 import Register from '../Register/component';
 import Login from '../Login/component';
+import toast, { Toaster } from 'react-hot-toast';
 
 const SavedComponentCard = ({ component, onPriceLoad }:
     { component: Component, onPriceLoad?: (componentId: string, price: number) => void }) => {
@@ -67,7 +68,6 @@ const SavedComponentCard = ({ component, onPriceLoad }:
     useEffect(() => {
         const fetchMinPrice = async () => {
             try {
-                //setIsLoading(true);
                 const response = await fetch(
                     `http://localhost:8080/offers/min?componentId=${component.id}`,
                     {
@@ -112,24 +112,34 @@ const SavedComponentCard = ({ component, onPriceLoad }:
             console.log('component.id', component.id);
             console.log('token', token);
 
+
             const response = await fetch('http://localhost:8080/subscriptions', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify({ componentId: component.id })
+                body: JSON.stringify({ componentId: String(component.id) })
             });
 
-            if (response.status === 204) {
+            if (response.ok) {
                 console.log('Подписка успешно создана');
+                toast.success(`Вы подписались на обновления компонента ${component.name}`);
             } else if (response.status === 400) {
+                console.log(response)
                 console.error('Некорректные данные для подписки');
+                toast.error('Некорректные данные для подписки');
             } else if (response.status === 401) {
                 console.error('Пользователь не авторизован');
+                toast.error('Требуется авторизация');
             } else {
+                console.log(response)
                 console.error('Неизвестная ошибка:', response.status);
+                toast.error('Ошибка');
             }
+
+
+            console.log(response)
         } catch (error) {
             console.error('Ошибка при подписке:', error);
         }
@@ -207,7 +217,7 @@ const SavedComponentCard = ({ component, onPriceLoad }:
                         />
                     )}
                 </div>
-
+                <Toaster position="top-right" />
 
             </div>
 
@@ -250,7 +260,7 @@ const SavedComponentCard = ({ component, onPriceLoad }:
 
             <Modal isOpen={isDetailsVisible} onClose={() => setIsDetailsVisible(false)}>
                 <ComponentDetails component={component} />
-            </Modal> {/* не возвращается бренд с бека */}
+            </Modal> 
         </div>
     );
 }

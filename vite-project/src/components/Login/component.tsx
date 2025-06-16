@@ -74,7 +74,6 @@ export default function Login({ setOpenComponent, onClose, message }:
                 console.log('Login successful:', responseData);
                 login(responseData.token.access_token);
                 onClose()
-                //setSuccessMessage(`Добро пожаловать!`);
                 reset();
             } else if (response.status === 401) {
                 setErrorMessage("Неверный email или пароль");
