@@ -4,14 +4,13 @@ interface AuthContextType {
     isAuthenticated: boolean;
     login: (token: string) => void;
     logout: () => void;
-    getToken: () => string | null; // Новая функция для получения токена
+    getToken: () => string | null; 
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [isAuthenticated, setIsAuthenticated] = useState(
-        // Инициализируем состояние из localStorage
         Boolean(localStorage.getItem('authToken'))
     );
 
@@ -28,7 +27,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         console.log('Logged out. Token removed.');
     }, []);
 
-    // Функция для получения текущего токена
     const getToken = useCallback(() => {
         return localStorage.getItem('authToken');
     }, []);
@@ -37,7 +35,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         isAuthenticated,
         login,
         logout,
-        getToken // Добавляем функцию в контекст
+        getToken 
     };
 
     return (

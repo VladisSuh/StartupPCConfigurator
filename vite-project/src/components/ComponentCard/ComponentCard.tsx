@@ -8,7 +8,7 @@ import { useAuth } from '../../AuthContext';
 import Login from '../Login/component';
 import Register from '../Register/component';
 import { useConfig } from '../../ConfigContext';
-
+import toast, { Toaster } from 'react-hot-toast';
 
 export const ComponentCard = ({ component, onSelect, selected, onPriceLoaded }: ComponentCardProps) => {
   const [minPrice, setMinPrice] = useState<number | null>(null);
@@ -18,13 +18,38 @@ export const ComponentCard = ({ component, onSelect, selected, onPriceLoaded }: 
   const [isOffersVisible, setIsOffersVisible] = useState(false);
   const [isDetailsVisible, setIsDetailsVisible] = useState(false);
   const [showLoginMessage, setShowLoginMessage] = useState(false);
+  const [isSubscribed, setIsSubscribed] = useState(false);
 
   const { isAuthenticated, getToken } = useAuth();
   const [isVisible, setIsVisible] = useState(false);
   const [openComponent, setOpenComponent] = useState('login');
   const { theme } = useConfig();
 
+  const checkSubscriptionStatus = async () => {
+    if (!isAuthenticated) return;
 
+    try {
+      const token = getToken();
+      const response = await fetch(
+        `http://localhost:8080/subscriptions/status?ids=${component.id}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Ошибка при проверке подписки');
+      }
+
+      const data = await response.json();
+      setIsSubscribed(data[component.id] === true);
+    } catch (err) {
+      console.error('Ошибка при проверке подписки:', err);
+    }
+  };
   useEffect(() => {
     const fetchMinPrice = async () => {
       try {
@@ -59,6 +84,7 @@ export const ComponentCard = ({ component, onSelect, selected, onPriceLoaded }: 
     };
 
     fetchMinPrice();
+    checkSubscriptionStatus();
 
   }, [component.id]);
 
@@ -136,51 +162,60 @@ export const ComponentCard = ({ component, onSelect, selected, onPriceLoaded }: 
     }
   };
 
-  const subscribeToComponent = async () => {
+  const handleSubscription = async () => {
     try {
       if (!isAuthenticated) {
-        throw new Error('Требуется авторизация');
+        setIsVisible(true);
+        setOpenComponent('login');
+        return;
       }
 
       const token = getToken();
-      console.log('component.id', component.id);
-      console.log('token', token);
 
-      console.log('Отправка запроса на подписку на компонент:', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ componentId: String(component.id) })
-      });
+      if (isSubscribed) {
+        const response = await fetch(
+          `http://localhost:8080/subscriptions/${component.id}`,
+          {
+            method: 'DELETE',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
 
-      const response = await fetch('http://localhost:8080/subscriptions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ componentId: String(component.id) })
-      });
-
-      if (!response.ok) {
-        if (response.status === 204) {
-          console.log('Подписка успешно создана');
-        } else if (response.status === 400) {
-          console.log(response)
-          console.error('Некорректные данные для подписки');
-        } else if (response.status === 401) {
-          console.error('Пользователь не авторизован');
+        if (response.ok) {
+          toast.success(`Вы отписались от обновлений компонента ${component.name}`);
+          setIsSubscribed(false);
+        } else if (response.status === 404) {
+          toast.error('Подписка не найдена');
         } else {
-          console.log(response)
-          console.error('Неизвестная ошибка:', response.status);
+          const errorMessage = await response.text();
+          toast.error(errorMessage || 'Ошибка при отписке');
+        }
+      } else {
+        const response = await fetch('http://localhost:8080/subscriptions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ componentId: String(component.id) })
+        });
+
+        if (response.ok) {
+          toast.success(`Вы подписались на обновления компонента ${component.name}`);
+          setIsSubscribed(true);
+        } else if (response.status === 400) {
+          toast.error('Некорректные данные для подписки');
+        } else {
+          const errorMessage = await response.text();
+          toast.error(errorMessage || 'Ошибка при подписке');
         }
       }
-
-      console.log(response)
     } catch (error) {
       console.error('Ошибка при подписке:', error);
+      toast.error('Произошла ошибка при выполнении запроса');
     }
   };
 
@@ -222,20 +257,26 @@ export const ComponentCard = ({ component, onSelect, selected, onPriceLoaded }: 
           )}
         </div>
 
-        <div onClick={subscribeToComponent}>
-          {theme === 'dark' ? (
+        <div onClick={handleSubscription}>
+          {isAuthenticated && isSubscribed ? (
             <img
               className={styles.notification}
-              src="src/assets/notifications-active-light.svg"
-              alt="Подписка на уведомления"
+              src={theme === 'dark'
+                ? "src/assets/notifications-off-light.svg"
+                : "src/assets/notifications-off-dark.svg"}
+
+              alt="Отписаться от уведомлений"
             />
           ) : (
             <img
               className={styles.notification}
-              src="src/assets/notifications-active-dark.svg"
-              alt="Подписка на уведомления"
+              src={theme === 'dark'
+                ? "src/assets/notifications-active-light.svg"
+                : "src/assets/notifications-active-dark.svg"}
+              alt="Подписаться на уведомления"
             />
           )}
+          <Toaster position="top-right" />
         </div>
       </div>
 

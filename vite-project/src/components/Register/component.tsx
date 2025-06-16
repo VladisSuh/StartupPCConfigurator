@@ -4,6 +4,7 @@ import classNames from "classnames";
 import { useState } from "react";
 import iconOpenEye from '../../assets/icon-open-eye.png'
 import iconClosedEye from '../../assets/icon-closed-eye.png'
+import { useConfig } from "../../ConfigContext";
 
 
 type RegisterData = {
@@ -43,6 +44,7 @@ export default function Register({ setOpenComponent, onClose }: { setOpenCompone
     const [loading, setLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
+    const { theme } = useConfig();
 
     const onSubmit: SubmitHandler<RegisterData> = async (data) => {
         setLoading(true);
@@ -93,14 +95,14 @@ export default function Register({ setOpenComponent, onClose }: { setOpenCompone
                     required: "Обязательное поле",
                     maxLength: {
                         value: 20,
-                        message: "Максимум 20 символов"
+                        message: "Максимум 20 символов" 
                     },
                 })}
                 onBlur={() => handleBlur("name")}
-                className={errors.email ? styles.errorInput : ''}
+                className={`${styles.input} ${styles[theme]} ${errors.email ? styles.errorInput : ''}`}
             />
             {errors.name && (
-                <p role="alert" className={styles.errorMessage}>
+                <p role="alert" className={`${styles.errorMessage} ${styles[theme]}`}>
                     {errors.name.message}
                 </p>
             )}
@@ -115,10 +117,10 @@ export default function Register({ setOpenComponent, onClose }: { setOpenCompone
                     }
                 })}
                 onBlur={() => handleBlur("email")}
-                className={errors.email ? styles.errorInput : ''}
+                className={`${styles.input} ${styles[theme]} ${errors.email ? styles.errorInput : ''}`}
             />
             {errors.email && (
-                <p role="alert" className={styles.errorMessage}>
+                <p role="alert" className={`${styles.errorMessage} ${styles[theme]}`}>
                     {errors.email.message}
                 </p>
             )}
@@ -143,7 +145,7 @@ export default function Register({ setOpenComponent, onClose }: { setOpenCompone
                         }
                     })}
                     onBlur={() => handleBlur("password")}
-                    className={`${styles.passwordInput} ${errors.password ? styles.errorInput : ''}`}
+                    className={`${styles.input} ${styles[theme]} ${styles.passwordInput} ${errors.password ? styles.errorInput : ''}`}
                 />
                 <button
                     type="button"
@@ -158,7 +160,7 @@ export default function Register({ setOpenComponent, onClose }: { setOpenCompone
                 </button>
             </div>
             {errors.password && (
-                <div className={styles.errorMessage}>
+                <div className={`${styles.errorMessage} ${styles[theme]}`}>
                     {errors.password.message}
                 </div>
             )}
