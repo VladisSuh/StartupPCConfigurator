@@ -36,6 +36,7 @@ func CheckCompatibility(components []domain.Component) []string {
 	psu := specsByCat["psu"]
 	cs := specsByCat["case"]
 	ssd := specsByCat["ssd"]
+	hdd := specsByCat["hdd"]
 
 	// 1) CPU ↔ MB: socket
 	if cpu != nil && mb != nil {
@@ -64,6 +65,27 @@ func CheckCompatibility(components []domain.Component) []string {
 			}
 		}
 	}
+
+	// 3.1) HDD ↔ MB: интерфейс + наличие портов
+	if hdd != nil && mb != nil {
+		// a) HDD должен быть SATA-семейства
+		if iface, _ := hdd["interface"].(string); !strings.HasPrefix(strings.ToUpper(iface), "SATA") {
+			errs = append(errs, fmt.Sprintf("HDD.interface %v ≠ SATA", iface))
+		}
+
+		// b) На плате обязательно ≥1 SATA-порт
+		if ports, ok := mb["sata_ports"].(float64); !ok || ports < 1 {
+			errs = append(errs, "HDD требует SATA-порт, а MB не поддерживает")
+		}
+	}
+
+	// 3.2) HDD ↔ Case: есть ли свободный 3.5-бей
+	if hdd != nil && cs != nil {
+		if bays, ok := cs["drive_bays_3_5"].(float64); ok && bays < 1 {
+			errs = append(errs, "Case не имеет 3.5\" отсеков для HDD")
+		}
+	}
+
 	// 4) GPU ↔ Case: длина
 	if gpu != nil && cs != nil {
 		if gl, ok1 := gpu["length_mm"].(float64); ok1 {
@@ -111,6 +133,15 @@ func CheckCompatibility(components []domain.Component) []string {
 		}
 		if p, ok := psu["power"].(float64); ok && p < need {
 			errs = append(errs, fmt.Sprintf("PSU.power %.0f < required %.0f", p, need))
+		}
+	}
+	// PSU ↔ Case form-factor
+	if psu != nil && cs != nil {
+		if ff, _ := psu["form_factor"].(string); ff != "" {
+			if cf, _ := cs["psu_form_factor"].(string); !strings.EqualFold(ff, cf) {
+				errs = append(errs,
+					fmt.Sprintf("PSU.form_factor %v ≠ Case.psu_form_factor %v", ff, cf))
+			}
 		}
 	}
 

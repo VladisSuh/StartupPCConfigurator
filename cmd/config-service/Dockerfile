@@ -13,4 +13,5 @@ WORKDIR /app
 COPY --from=builder /app/config /app/config
 
 EXPOSE 8002
+EXPOSE 6060
 CMD ["/app/config"]

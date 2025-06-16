@@ -2,7 +2,7 @@
 @config_host = http://localhost:8080
 
 
-@email     = krasina_2003@mail.ru
+@email = krasina_2003@mail.ru
 
 ################################################################################
 ### 1. регистрация
@@ -32,11 +32,10 @@ Content-Type: application/json
 #       "expires_at":   "..."
 #   }
 ################################################################################
-@access_token  = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImZvcm1haWx2bGFkaXNAZ21haWwuY29tIiwiZXhwIjoxNzUwMTUyMDA3LCJ1c2VyX2lkIjoiMjU2YjVhNGEtZWIwZS00NzlhLTk2OTYtNTVlMDM5ZGUwZjk1In0.VFdOdKk4ueCj6Bkx2ANsrCYZuv758qro1jqIDPsopDs
-@refresh_token = 2
-
+@access_token  = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImZvcm1haWx2bGFkaXNAZ21haWwuY29tIiwiZXhwIjoxNzUwMDg1MDUxLCJ1c2VyX2lkIjoiYjFmZGQxMDgtYmQ5Yi00NzA1LThlMGUtOTE5OTQwZTJjOGVlIn0.nxkuE8PJaLX26kKmBNibqHGeNuCLn4VdmqZF9lGxt_w
+@refresh_token = 1
 ################################################################################
-### 3. вызов /auth/me (проверяем access‑token)
+### 3. 
 GET {{auth_host}}/auth/me
 Authorization: Bearer {{access_token}}
 
@@ -49,7 +48,6 @@ Content-Type: application/json
   "refresh_token": "{{refresh_token}}"
 }
 
-### скопируйте новые access/refresh‑token’ы, если нужны
 
 ################################################################################
 ### 5. запрос на сброс пароля
@@ -64,7 +62,7 @@ Content-Type: application/json
 # http://localhost:8080/auth/reset_password?token=XYZ
 # скопируйте значение XYZ:
 
-@reset_token =  0b9oVFmMCZW0lyfZCfrhZfBfH8sUQjexmNu17wdun8Y=
+@reset_token = DneFmaBbM-y5cgjCD8FyKHQPKaUmEzbTMC1Nch-YQQE=
 
 ################################################################################
 ### 6. завершение сброса пароля
@@ -87,52 +85,47 @@ Content-Type: application/json
 }
 
 ################################################################################
-### 8. подтверждение e‑mail (если у вас есть код)
+### 7. подтверждение e‑mail
 POST {{auth_host}}/auth/verify_email
 Content-Type: application/json
 
 {
   "email": "{{email}}",
-  "verification_code": "Dq0fTJtg"
+  "verification_code": "uAyBjQPm"
 }
 
 ################################################################################
-### 9. выход (logout)
+### 8. выход (logout)
 POST {{auth_host}}/auth/logout
 Authorization: Bearer {{access_token}}
 
 
 ################################################################################
-### 10. удаление аккаунта (DELETE) — работает через access_token
+### 9. удаление аккаунта (DELETE)
 DELETE {{auth_host}}/auth/delete
 Authorization: Bearer {{access_token}}
 
-### 11. получить список компонентов
+### 10. получить список компонентов
 GET {{config_host}}/config/components
-# Авторизация не обязательна, но можно передать токен для трассировки
-# Authorization: Bearer {{access_token}}
 
 ### 11.1 получить компоненты по категории
-GET {{config_host}}/config/components?category=cooler
-Authorization: Bearer {{access_token}}
+GET {{config_host}}/config/components?category=ssd
 
-### 11.2 поиск компонентов по названию
-GET {{config_host}}/config/components?search=AMD%20Ryzen%205%205600X
-Authorization: Bearer {{access_token}}
-
-### 11.3 получить компоненты по категории и бренду
+### 11.2 получить компоненты по категории и бренду
 GET {{config_host}}/config/components?category=hdd&brand=Seagate
 
-### 11.4 получить компоненты по категории и сценарию сборки 
+### 11.3 получить компоненты по категории и сценарию сборки 
 GET {{config_host}}/config/components?category=motherboard&usecase=office
 
-
-### 12 получить бренды по категории
+### 12. получить бренды по категории
 GET {{config_host}}/config/brands?category=motherboard
-Authorization: Bearer {{access_token}}
 
 ################################################################################
-### 12. создание конфигурации
+### 13. поиск компонентов по названию
+GET {{config_host}}/config/components?search=ryzen
+
+################################################################################
+### 14. создание конфигурации
 @config_name = My First PC Build
 
 POST {{config_host}}/config/newconfig
@@ -149,10 +142,6 @@ Authorization: Bearer {{access_token}}
     {
       "category": "GPU",
       "name": "NVIDIA GeForce RTX 3060"
-    },
-    {
-      "category": "motherboard",
-      "name": "MSI B550 Tomahawk"
     }
   ]
 }
@@ -160,106 +149,7 @@ Authorization: Bearer {{access_token}}
 ### ↓ после выполнения скопируйте поле id конфигурации ########################
 @config_id = 1
 
-################################################################################
-### 13. обновление конфигурации
-PUT {{config_host}}/config/newconfig/{{config_id}}
-Content-Type: application/json
-Authorization: Bearer {{access_token}}
-
-{
-  "name": "Updated PC Build",
-  "components": [
-    {
-      "category": "CPU",
-      "name": "AMD Ryzen 7 7700X"
-    },
-    {
-      "category": "GPU",
-      "name": "AMD Radeon RX 6700 XT"
-    }
-  ]
-}
-
-
-################################################################################
-### 14. получить совместимые компоненты
-
-# 1) Материнские платы, совместимые с CPU «AMD Ryzen 5 5600X»
-POST {{config_host}}/config/compatible
-Authorization: Bearer {{access_token}}
-Content-Type: application/json
-
-{
-  "category": "motherboard",
-  "bases": [
-    { "category": "cpu", "name": "AMD Ryzen 5 5600X" }
-  ],
-  "brand": "MSI"      
-}
-
-###
-
-# 2) SSD, совместимые с материнской платой «MSI B550 Tomahawk»
-POST {{config_host}}/config/compatible
-Authorization: Bearer {{access_token}}
-Content-Type: application/json
-
-{
-  "category": "ssd",
-  "bases": [
-    { "category": "motherboard", "name": "MSI B550 Tomahawk" }
-  ],
-  "usecase": "gaming"
-}
-
-###
-
-# 3) PSU, способные питать одновременно CPU и GPU
-POST {{config_host}}/config/compatible
-Authorization: Bearer {{access_token}}
-Content-Type: application/json
-
-{
-  "category": "psu",
-  "bases": [
-    { "category": "cpu", "name": "AMD Ryzen 5 5600X" },
-    { "category": "gpu", "name": "NVIDIA GeForce RTX 3060" }
-  ]
-}
-
-###
-
-# 3) Cooler, способные охлаждать CPU и входить в CASE
-POST  {{config_host}}/config/compatible
-Authorization: Bearer {{access_token}}
-Content-Type: application/json
-
-{
-  "category": "cooler",
-  "bases": [
-    { "category":"cpu", "name":"AMD Ryzen 5 5600X" },
-    { "category":"case", "name":"NZXT H510" }
-  ]
-}
-
-################################################################################
-### 15. получить конфигурации пользователя
-GET {{config_host}}/config/userconf
-Authorization: Bearer {{access_token}}
-
-################################################################################
-### 16. удалить конфигурацию
-DELETE {{config_host}}/config/newconfig/{{config_id}}
-Authorization: Bearer {{access_token}}
-
-
-
-################################################################################
-### 20. попытка создать конфигурацию с несовместимыми компонентами
-
-
-################################################################################
-### A. Несовместимость по socket (CPU ↔︎ Motherboard)
+### 14.1. попытка создать конфигурацию с несовместимыми компонентами
 @config_name1 = InvalidSocketBuild
 
 POST {{config_host}}/config/newconfig
@@ -280,67 +170,121 @@ Authorization: Bearer {{access_token}}
   ]
 }
 
-### ↓ ожидаемый ответ — HTTP 400 Bad Request с описанием socket-несовместимости
-HTTP/1.1 400 Bad Request
-Content-Type: application/json
-
-{
-  "error": "сборка несовместима: CPU и Motherboard несовместимы (socket)"
-}
-
-
-################################################################################
-### B. Несовместимость по типу памяти (RAM ↔ Motherboard)
-@config_name2 = InvalidRamBuild
-
-POST {{config_host}}/config/newconfig
+### 14.2. обновление конфигурации
+PUT {{config_host}}/config/newconfig/{{config_id}}
 Content-Type: application/json
 Authorization: Bearer {{access_token}}
 
 {
-  "name": "{{config_name}}",
+  "name": "Updated PC Build",
   "components": [
     {
-      "category": "ram",
-      "name": "G.Skill Trident Z5 RGB 32GB DDR5-6000"
+      "category": "CPU",
+      "name": "AMD Ryzen 7 7700X"
     },
     {
-      "category": "motherboard",
-      "name": "MSI B550 Tomahawk"
+      "category": "GPU",
+      "name": "AMD Radeon RX 6700 XT"
     }
   ]
 }
 
-### ↓ ожидаемый ответ — HTTP 400 с ошибкой типа памяти
-HTTP/1.1 400 Bad Request
+
+### 14.3. удалить конфигурацию
+DELETE {{config_host}}/config/newconfig/{{config_id}}
+Authorization: Bearer {{access_token}}
+
+################################################################################
+### 15. получить конфигурации пользователя
+GET {{config_host}}/config/userconf
+Authorization: Bearer {{access_token}}
+
+
+################################################################################
+### 16. получить совместимые компоненты
+
+### 1) Материнские платы, совместимые с CPU «AMD Ryzen 5 5600X»
+POST {{config_host}}/config/compatible
+Authorization: Bearer {{access_token}}
 Content-Type: application/json
 
 {
-  "error": "сборка несовместима: RAM и Motherboard несовместимы (тип памяти)"
+  "category": "motherboard",
+  "bases": [
+    { "category": "cpu", "name": "AMD Ryzen 5 5600X" }
+  ],
+  "brand": "MSI"      
 }
 
+### 2) SSD, совместимые с материнской платой «MSI B550 Tomahawk»
+POST {{config_host}}/config/compatible
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
 
+{
+  "category": "ssd",
+  "bases": [
+    { "category": "motherboard", "name": "MSI B550 Tomahawk" }
+  ],
+  "usecase": "gaming"
+}
+
+### 3) PSU, способные питать одновременно CPU и GPU
+POST {{config_host}}/config/compatible
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+  "category": "psu",
+  "bases": [
+    { "category": "cpu", "name": "AMD Ryzen 5 5600X" },
+    { "category": "gpu", "name": "NVIDIA GeForce RTX 3060" }
+  ]
+}
+
+### 4) Cooler, способные охлаждать CPU и входить в CASE
+POST  {{config_host}}/config/compatible
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+  "category": "cooler",
+  "bases": [
+    { "category":"cpu", "name":"AMD Ryzen 5 5600X" },
+    { "category":"case", "name":"NZXT H510" }
+  ]
+}
+
+### 5) Case
+POST  {{config_host}}/config/compatible
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+  "category": "case",
+  "bases": [
+    { "category":"cpu", "name":"AMD Ryzen 5 5600X" },
+    { "category":"ssd", "name":"Sabrent Rocket 4 Plus 2TB" }
+  ]
+}
 
 ################################################################################
-### 23. получить список сценариев
+### 17. получить список сценариев
 GET {{config_host}}/config/usecases
-# Authorization: Bearer {{access_token}}  (необязательно)
 
 ################################################################################
-### 24. получить готовые сборки по сценарию 
-### office 
-GET {{config_host}}/config/usecase/office
-# Authorization: Bearer {{access_token}}  (необязательно)
+### 18. получить готовые сборки по сценарию 
+GET {{config_host}}/config/usecase/cad
 
-###GET на агрегатор
-GET http://localhost:8080/offers?
-    componentId=1&
-    sort=priceAsc
+
+
+         
+### 19. GET на агрегатор
+GET http://localhost:8080/offers?componentId=1&sort=priceAsc
 Authorization: Bearer {{access_token}}
 
-###GET на минимальную цену агрегатора
-GET http://localhost:8080/offers/min?
-    componentId=12
+### 20. Минимальная цена агрегатора
+GET http://localhost:8080/offers/min?componentId=12
 
 ###################Не работает в REST-тестах
 POST http://localhost:8080/offers/import
@@ -348,13 +292,13 @@ Content-Type: multipart/form-data
 
 file=@./dns_pricelist.xlsx;type=application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
 
-###Post на создание подписки
+### 21. Post на создание подписки
 POST http://localhost:8080/subscriptions
 Content-Type: application/json
 Authorization: Bearer {{access_token}}
 
 {
-  "componentId": "1"
+  "componentId": "1000"
 }
 
 ###Notifications GET на Redis
@@ -362,7 +306,7 @@ GET http://localhost:8080/notifications/count
 Authorization: Bearer {{access_token}}
 
 ###Post на Redis
-@notificationId = d9e4ca14-684d-4351-b03a-2a181b546591
+@notificationId = 77847fc5-9ba5-47b7-a7d6-067532edea19
 POST http://localhost:8080/notifications/{{notificationId}}/read
 Authorization: Bearer {{access_token}}
 

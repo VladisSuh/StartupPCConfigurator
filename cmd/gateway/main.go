@@ -16,6 +16,7 @@ import (
 )
 
 func main() {
+
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
 		jwtSecret = "secret_key"
